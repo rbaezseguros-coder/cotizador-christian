@@ -45,7 +45,7 @@ Para CADA opción de "Todo Riesgo con franquicia" (Cobertura D) genera un bloque
     const data = await response.json();
     console.log('Gemini response:', JSON.stringify(data));
 
-    const msg = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No se pudo procesar el PDF';
+    const msg = data?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
 
     return {
       statusCode: 200,
