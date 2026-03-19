@@ -46,7 +46,6 @@ Para CADA opción de "Todo Riesgo con franquicia" (Cobertura D) genera un bloque
     console.log('Gemini response:', JSON.stringify(data));
 
     const msg = data?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
-
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
