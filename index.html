@@ -218,6 +218,10 @@ input[type="file"] { display: none; }
     <div class="sel-counter" id="selCounter">Seleccioná al menos <strong>1 cobertura</strong></div>
     <div class="coberturas-list" id="coberturasList"></div>
 
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:700;color:var(--ink-dim);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Nombre del cliente</label>
+      <input type="text" id="nombreCliente" placeholder="Ej: Silvio" style="width:100%;padding:11px 14px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Barlow',sans-serif;font-size:14px;background:var(--surface);color:var(--ink);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--ink)'" onblur="this.style.borderColor='var(--border2)'">
+    </div>
     <div class="status" id="status2"></div>
     <button class="btn-primary" id="btnGenerar" onclick="generarMensaje()" disabled>✍️ Generar mensaje</button>
     <button class="btn-secondary" onclick="irPaso(1)">← Volver y agregar más PDFs</button>
@@ -442,6 +446,7 @@ async function generarMensaje(){
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         accion: 'generar',
+        nombreCliente: document.getElementById('nombreCliente').value.trim() || 'cliente',
         vehiculo: cotizacion.vehiculo,
         coberturas: datos,
         esComparativa: sels.length > 1,
