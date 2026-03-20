@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     // Cambiamos el nombre al formato exacto que pide la API de Google
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const { base64 } = req.body;
     if (!base64) return res.status(400).json({ error: 'No se recibió el archivo correctamente' });
