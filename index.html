@@ -459,21 +459,21 @@ async function generarMensaje(){
     const data = await res.json();
     const mensaje = data.mensaje || '';
 
-    // Reemplazar marcadores con emojis
+    // Reemplazar marcadores con Unicode escapes
     const mensajeConEmojis = mensaje
-      .replace(/\[SALUDO\]/g, '😊')
-      .replace(/\[AUTO\]/g, '🚗')
-      .replace(/\[ESCUDO\]/g, '🛡')
-      .replace(/\[EMPRESA\]/g, '🏢')
-      .replace(/\[DINERO\]/g, '💰')
-      .replace(/\[FRANQUICIA\]/g, '📌')
-      .replace(/\[ESTRELLA\]/g, '✨')
-      .replace(/\[CHECK\]/g, '✔')
-      .replace(/\[DATOS\]/g, '📣')
-      .replace(/\[PUNTO\]/g, '🔸')
-      .replace(/\[TARJETA\]/g, '💳')
-      .replace(/\[OK\]/g, '👍')
-      .replace(/\[VERSUS\]/g, '⚖');
+      .replace(/\[SALUDO\]/g, '\uD83D\uDE0A')
+      .replace(/\[AUTO\]/g, '\uD83D\uDE97')
+      .replace(/\[ESCUDO\]/g, '\uD83D\uDEE1\uFE0F')
+      .replace(/\[EMPRESA\]/g, '\uD83C\uDFE2')
+      .replace(/\[DINERO\]/g, '\uD83D\uDCB0')
+      .replace(/\[FRANQUICIA\]/g, '\uD83D\uDCCC')
+      .replace(/\[ESTRELLA\]/g, '\u2728')
+      .replace(/\[CHECK\]/g, '\u2714\uFE0F')
+      .replace(/\[DATOS\]/g, '\uD83D\uDCE3')
+      .replace(/\[PUNTO\]/g, '\uD83D\uDD37')
+      .replace(/\[TARJETA\]/g, '\uD83D\uDCB3')
+      .replace(/\[OK\]/g, '\uD83D\uDC4D')
+      .replace(/\[VERSUS\]/g, '\u2696\uFE0F');
     document.getElementById('resultBox').textContent=mensajeConEmojis;
     document.getElementById('btnWA').href='https://wa.me/?text='+encodeURIComponent(mensajeConEmojis);
     irPaso(3);hideStatus('status2');
