@@ -123,7 +123,7 @@ REGLAS DE PRECIOS:
 
   const geminiBody = {
     contents: [{ parts }],
-    generationConfig: { maxOutputTokens: 2000, temperature: 0.1 }
+    generationConfig: { maxOutputTokens: 2000, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } }
   };
 
   const geminiRes = await fetch(
@@ -173,7 +173,7 @@ ${hayMultiCompania ? '- Mencioná las diferencias de facturación entre compañ�
 
   const geminiBody = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
+    generationConfig: { maxOutputTokens: 1500, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } }
   };
 
   const geminiRes = await fetch(
