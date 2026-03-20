@@ -1,0 +1,13 @@
+{
+  "name": "cotizador-pro-sanchez",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Cotizador de Seguros Multi-compañía con IA — Christian Sanchez PAS",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": "20.x"
+  }
+}
