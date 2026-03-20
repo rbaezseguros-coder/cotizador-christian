@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require("@google-generative-ai/generative-ai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 exports.handler = async (event) => {
   // 1. Verificamos que sea un pedido POST
