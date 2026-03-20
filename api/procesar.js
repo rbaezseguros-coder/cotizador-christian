@@ -38,6 +38,7 @@ const BASE = {
 };
 
 export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -151,7 +152,7 @@ REGLAS DE PRECIOS:
 }
 
 async function generarMensaje(req, res, apiKey) {
-  const { vehiculo, coberturas, esComparativa, hayMultiCompania, tipoPrecio } = req.body;
+  const { vehiculo, coberturas, esComparativa, hayMultiCompania, tipoPrecio, nombreCliente } = req.body;
 
   const prompt = `Sos Christian Sanchez, Productor Asesor de Seguros en Resistencia, Chaco.
 
@@ -168,6 +169,7 @@ ${hayMultiCompania ? '- Mencioná las diferencias de facturación entre compañ�
 - Si hay Todo Riesgo con franquicia, explicá en 1 frase qué significa la franquicia en términos simples
 - Si hay descuento de El Norte por débito automático, destacalo
 - Cerrá con frase cálida invitando a consultar cualquier duda
+- El mensaje SIEMPRE debe empezar exactamente así (primera línea): "Hola ${nombreCliente ? nombreCliente : 'cliente'} 👋, te paso la cotización para tu vehículo"
 - Sin firma formal al final, sin "Atentamente"
 - Máximo 40 líneas, fácil de leer en el celular`;
 
