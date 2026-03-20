@@ -1,47 +1,43 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+// /api/procesar.js
+export default async function handler(req, res) {
+  // Solo permitimos peticiones POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
 
-module.exports = async (req, res) => {
-  // Manejo de CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const apiKey = process.env.GEMINI_API_KEY;
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Falta la configuración de API en el servidor' });
+  }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("Falta la configuración de GEMINI_API_KEY en Vercel");
+    // El cuerpo de la petición ya viene formateado desde el frontend
+    const body = req.body;
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    // Cambiamos el nombre al formato exacto que pide la API de Google
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // URL de la API de Google Gemini (v1.5 Flash)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    const { base64 } = req.body;
-    if (!base64) return res.status(400).json({ error: 'No se recibió el archivo correctamente' });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-    const prompt = `
-      Actuá como Christian Sanchez, PAS de Resistencia, Chaco.
-      Extraé del PDF de El Norte Seguros: Vehículo (Marca/Modelo), Patente y las opciones de franquicias.
-      
-      Redactá un mensaje de WhatsApp que sea humano y profesional:
-      1. Saludá y presentá la cotización.
-      2. Usá emojis (🚗, ✅, 💰).
-      3. Destacá el 5% de DESCUENTO por Débito Automático (CBU o Tarjeta).
-      4. Si son 4 cuotas, poné vigencia de 4 meses.
-      5. Sin firmas genéricas ni etiquetas de cita.
-    `;
+    const data = await response.json();
 
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { data: base64, mimeType: "application/pdf" } }
-    ]);
+    if (!response.ok) {
+      console.error('Error de Gemini:', data);
+      return res.status(response.status).json(data);
+    }
 
-    const response = await result.response;
-    res.status(200).json({ texto: response.text() });
+    // Devolvemos la respuesta de la IA al frontend
+    return res.status(200).json(data);
 
   } catch (error) {
-    console.error("Error en el servidor:", error);
-    res.status(500).json({ error: 'Fallo la comunicación con la IA', detalle: error.message });
+    console.error('Error en el servidor:', error);
+    return res.status(500).json({ error: 'Error interno al procesar la solicitud' });
   }
-};
+}
