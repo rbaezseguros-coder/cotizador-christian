@@ -161,7 +161,6 @@ input[type="file"] { display: none; }
     <div class="step-item" id="step3"><div class="step-num">3</div>Mensaje WhatsApp</div>
   </div>
 
-  <!-- PANEL 1 -->
   <div class="panel active" id="panel1">
     <div class="panel-heading">Subí las cotizaciones</div>
     <div class="panel-sub">Arrastrá uno o más PDFs — de cualquier compañía. La IA los detecta automáticamente.</div>
@@ -187,7 +186,6 @@ input[type="file"] { display: none; }
     </button>
   </div>
 
-  <!-- PANEL 2 -->
   <div class="panel" id="panel2">
     <div class="panel-heading">Elegí las coberturas</div>
     <div class="panel-sub">Seleccioná las que querés presentar. Podés mezclar compañías libremente.</div>
@@ -227,7 +225,6 @@ input[type="file"] { display: none; }
     <button class="btn-secondary" onclick="irPaso(1)">← Volver y agregar más PDFs</button>
   </div>
 
-  <!-- PANEL 3 -->
   <div class="panel" id="panel3">
     <div class="panel-heading">Mensaje listo ✓</div>
     <div class="panel-sub">Revisá, editá si querés y enviá por WhatsApp</div>
@@ -241,7 +238,7 @@ input[type="file"] { display: none; }
     </div>
 
     <div class="result-box" id="resultBox" contenteditable="false"></div>
-    <a class="btn-whatsapp" id="btnWA" href="#" target="_blank">💬 Abrir en WhatsApp</a>
+    <button class="btn-whatsapp" id="btnWA" onclick="enviarAWhatsApp()">💬 Abrir en WhatsApp</button>
     <button class="btn-secondary" onclick="irPaso(2)">← Cambiar selección</button>
     <button class="btn-secondary" onclick="nuevaCotizacion()">🔄 Nueva cotización</button>
   </div>
@@ -321,14 +318,12 @@ async function analizarTodo() {
   showStatus('status1','info',`⏳ Analizando ${archivos.length} PDF${archivos.length>1?'s':''}...`);
 
   try {
-    // Convertir todos los PDFs a base64
     const pdfs = [];
     for(const f of archivos){
       const b64 = await toBase64(f);
       pdfs.push({nombre: f.name, base64: b64});
     }
 
-    // Llamar al backend
     const res = await fetch('/api/procesar', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -459,7 +454,6 @@ async function generarMensaje(){
     const data = await res.json();
     const mensaje = data.mensaje || '';
 
-    // Reemplazar marcadores con Unicode escapes
     const mensajeConEmojis = mensaje
       .replace(/\[SALUDO\]/g, '\uD83D\uDE0A')
       .replace(/\[AUTO\]/g, '\uD83D\uDE97')
@@ -474,15 +468,26 @@ async function generarMensaje(){
       .replace(/\[TARJETA\]/g, '\uD83D\uDCB3')
       .replace(/\[OK\]/g, '\uD83D\uDC4D')
       .replace(/\[VERSUS\]/g, '\u2696\uFE0F');
+    
     document.getElementById('resultBox').textContent=mensajeConEmojis;
-    document.getElementById('btnWA').href='https://wa.me/?text='+encodeURIComponent(mensajeConEmojis);
-    irPaso(3);hideStatus('status2');
+    irPaso(3);
+    hideStatus('status2');
 
   } catch(err){
     showStatus('status2','error','❌ '+err.message);
   } finally {
     btn.disabled=false;btn.innerHTML='✍️ Generar mensaje';
   }
+}
+
+// FUNCIÓN PARA ENVIAR A WHATSAPP SIN QUE SE ROMPAN LOS EMOJIS
+function enviarAWhatsApp() {
+    const texto = document.getElementById('resultBox').textContent;
+    if(!texto) return;
+    
+    // Usamos encodeURIComponent sobre el texto limpio del recuadro
+    const url = "https://api.whatsapp.com/send?text=" + encodeURIComponent(texto);
+    window.open(url, '_blank');
 }
 
 // ── HELPERS ──
@@ -503,7 +508,7 @@ function editar(){
   box.contentEditable=ed?'false':'true';
   box.style.outline=ed?'':'2px solid var(--norte)';
   if(!ed){box.focus();showStatus('status2','info','✏️ Modo edición — tocá "Editar" de nuevo para salir');}
-  else{hideStatus('status2');document.getElementById('btnWA').href='https://wa.me/?text='+encodeURIComponent(box.textContent);}
+  else{hideStatus('status2');}
 }
 
 function nuevaCotizacion(){
