@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 module.exports = async (req, res) => {
+  // Manejo de CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -10,15 +11,26 @@ module.exports = async (req, res) => {
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("Falta GEMINI_API_KEY");
+    if (!apiKey) throw new Error("Falta la configuración de GEMINI_API_KEY en Vercel");
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Cambiamos el nombre al formato exacto que pide la API de Google
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
     const { base64 } = req.body;
-    if (!base64) return res.status(400).json({ error: 'Falta el archivo' });
+    if (!base64) return res.status(400).json({ error: 'No se recibió el archivo correctamente' });
 
-    const prompt = "Sos Christian Sanchez, PAS. Extraé de este PDF de El Norte: Vehículo, Patente y costos de Franquicias A, B, C y Todo Riesgo. Armá un mensaje humano para WhatsApp mencionando el 5% de descuento por débito automático. Si son 4 cuotas, vigencia 4 meses. Sin etiquetas de cita.";
+    const prompt = `
+      Actuá como Christian Sanchez, PAS de Resistencia, Chaco.
+      Extraé del PDF de El Norte Seguros: Vehículo (Marca/Modelo), Patente y las opciones de franquicias.
+      
+      Redactá un mensaje de WhatsApp que sea humano y profesional:
+      1. Saludá y presentá la cotización.
+      2. Usá emojis (🚗, ✅, 💰).
+      3. Destacá el 5% de DESCUENTO por Débito Automático (CBU o Tarjeta).
+      4. Si son 4 cuotas, poné vigencia de 4 meses.
+      5. Sin firmas genéricas ni etiquetas de cita.
+    `;
 
     const result = await model.generateContent([
       prompt,
@@ -29,7 +41,7 @@ module.exports = async (req, res) => {
     res.status(200).json({ texto: response.text() });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error("Error en el servidor:", error);
+    res.status(500).json({ error: 'Fallo la comunicación con la IA', detalle: error.message });
   }
 };
