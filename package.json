@@ -1,7 +1,19 @@
 {
-  "name": "cotizador-christian",
+  "name": "cotizador-pro-sanchez",
   "version": "1.0.0",
+  "description": "Cotizador de Seguros con IA para Christian Sanchez PAS",
+  "main": "api/procesar.js",
+  "scripts": {
+    "start": "serve .",
+    "dev": "vercel dev"
+  },
+  "keywords": [],
+  "author": "Christian Sanchez",
+  "license": "ISC",
   "dependencies": {
-    "@google/generative-ai": "^0.21.0"
+    "node-fetch": "^3.3.0"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
