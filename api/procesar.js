@@ -148,9 +148,9 @@ REGLAS DE PRECIOS:
   else jsonStr = texto.replace(/```json|```/g, '').trim();
   const cotizacion = JSON.parse(jsonStr);
 
-  const jsonStr = JSON.stringify(cotizacion);
+  const jsonOut1 = JSON.stringify(cotizacion);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.status(200).end(jsonStr);
+  res.status(200).end(jsonOut1);
 }
 
 async function generarMensaje(req, res, apiKey) {
