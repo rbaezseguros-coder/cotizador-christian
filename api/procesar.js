@@ -140,8 +140,12 @@ REGLAS DE PRECIOS:
   const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
   if (!texto) throw new Error('Gemini no devolvió texto. Verificá la API key y el billing.');
 
-  const limpio = texto.replace(/```json|```/g, '').trim();
-  const cotizacion = JSON.parse(limpio);
+  // Limpiar respuesta — Gemini 2.5 puede agregar texto extra
+  let jsonStr = texto;
+  const jsonMatch = texto.match(/{[\s\S]*}/);
+  if (jsonMatch) jsonStr = jsonMatch[0];
+  else jsonStr = texto.replace(/```json|```/g, '').trim();
+  const cotizacion = JSON.parse(jsonStr);
 
   return res.status(200).json(cotizacion);
 }
