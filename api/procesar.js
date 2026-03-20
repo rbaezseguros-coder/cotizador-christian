@@ -148,9 +148,8 @@ REGLAS DE PRECIOS:
   else jsonStr = texto.replace(/```json|```/g, '').trim();
   const cotizacion = JSON.parse(jsonStr);
 
-  const jsonOut1 = JSON.stringify(cotizacion);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.status(200).end(jsonOut1);
+  res.status(200).end(Buffer.from(JSON.stringify(cotizacion), 'utf8'));
 }
 
 async function generarMensaje(req, res, apiKey) {
@@ -194,7 +193,6 @@ ${hayMultiCompania ? '- Mencioná las diferencias de facturación entre compañ�
   const mensaje = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
   if (!mensaje) throw new Error('Gemini no devolvió el mensaje.');
 
-  const jsonOut = JSON.stringify({ mensaje });
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.status(200).end(jsonOut);
+  res.status(200).end(Buffer.from(JSON.stringify({ mensaje }), 'utf8'));
 }
