@@ -157,22 +157,45 @@ async function generarMensaje(req, res, apiKey) {
 
   const prompt = `Sos Christian Sanchez, Productor Asesor de Seguros en Resistencia, Chaco.
 
-Generá un mensaje de WhatsApp ${esComparativa ? 'comparativo' : 'de presentación'} para el vehículo: ${vehiculo.descripcion}${vehiculo.patente ? ', patente ' + vehiculo.patente : ''}.
+Generá un mensaje de WhatsApp para el vehiculo: ${vehiculo.descripcion}${vehiculo.patente ? ', patente ' + vehiculo.patente : ''}.
 
 ${esComparativa ? 'Coberturas a comparar' : 'Cobertura a presentar'}:
 ${JSON.stringify(coberturas, null, 2)}
 
-Instrucciones:
-- Usá emojis (🚗 🛡️ ✅ ❌ 💰 💡 ⚠️)
-- Lenguaje simple, que entienda cualquier persona
-${esComparativa ? '- Marcá diferencias clave con ✅ y ❌' : ''}
-${hayMultiCompania ? '- Mencioná las diferencias de facturación entre compañías (ej: uno cobra por mes, otro cada 6 meses) — esto es importante para el cliente' : ''}
-- Si hay Todo Riesgo con franquicia, explicá en 1 frase qué significa la franquicia en términos simples
-- Si hay descuento de El Norte por débito automático, destacalo
-- Cerrá con frase cálida invitando a consultar cualquier duda
-- El mensaje SIEMPRE debe empezar exactamente así (primera línea): "Hola ${nombreCliente ? nombreCliente : 'cliente'} 👋, te paso la cotización para tu vehículo"
-- Sin firma formal al final, sin "Atentamente"
-- Máximo 40 líneas, fácil de leer en el celular`;
+MUY IMPORTANTE: NO uses emojis en el texto. En cambio, usa estos marcadores exactos:
+- Usa [SALUDO] donde iria el emoji de saludo
+- Usa [AUTO] donde iria el emoji de auto
+- Usa [ESCUDO] donde iria el emoji de cobertura
+- Usa [EMPRESA] donde iria el emoji de empresa
+- Usa [DINERO] donde iria el emoji de precio
+- Usa [FRANQUICIA] donde iria el emoji de franquicia
+- Usa [ESTRELLA] donde iria el emoji de que incluye
+- Usa [CHECK] donde iria el emoji de check por cada item
+- Usa [DATOS] donde iria el emoji de datos importantes
+- Usa [PUNTO] donde iria el emoji de cada dato
+- Usa [TARJETA] donde iria el emoji de descuento debito
+- Usa [OK] al cierre
+- Usa [VERSUS] para comparativa
+
+FORMATO:
+[SALUDO] Hola ${nombreCliente || 'cliente'}! Te paso la cotizacion para tu vehiculo:
+[AUTO] MARCA MODELO (AÑO) [ESCUDO] Cobertura: NOMBRE [EMPRESA] COMPANIA EN MAYUSCULAS
+[DINERO] Precio TIPO: PRECIO
+Si hay franquicia: [FRANQUICIA] Como funciona: en un siniestro por choque, vos pones los primeros $X. Si cuesta mas, la aseguradora cubre el resto.
+[ESTRELLA] Que incluye:
+[CHECK] item
+[CHECK] item
+[DATOS] Datos importantes:
+[PUNTO] Facturacion TIPO (cada X meses)
+Si franquicia: [PUNTO] Franquicia fija: $X
+Si El Norte: [TARJETA] 5% de descuento con debito automatico (tarjeta o CBU)
+[OK] Quedo atento a cualquier duda
+
+${esComparativa ? 'Repeti el bloque por cada opcion. Al final: [VERSUS] Cual conviene? Comparacion breve.' : ''}
+${hayMultiCompania ? 'Menciona diferencias de facturacion entre companias.' : ''}
+
+Lenguaje simple. Sin asteriscos. Sin guiones para items. Sin firma. Maximo 50 lineas.`;
+
 
   const geminiBody = {
     contents: [{ parts: [{ text: prompt }] }],
