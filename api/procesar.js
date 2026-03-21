@@ -129,10 +129,12 @@ SANCOR (facturacion mensual):
 - precio_contado = null / precio_cuatrimestral = null / precio_semestral = null
 
 REGLAS DE FRANQUICIA:
-- La franquicia es el monto que paga el asegurado en caso de siniestro. NO confundir con ajuste de suma asegurada.
-- El Norte: franquicia_tipo = "fija", franquicia_valor = monto en pesos (ej: "$700.000")
-- FedPat y Sancor: franquicia_tipo = "porcentaje", franquicia_valor = porcentaje (ej: "10%")
-- Si no tiene franquicia real de siniestro: ambos null
+- La franquicia es el monto que paga el asegurado de su bolsillo en caso de siniestro parcial.
+- NO es lo mismo que ajuste automático de suma asegurada. Son conceptos distintos.
+- Solo tienen franquicia real los planes TODO RIESGO: Norte D, FedPat TD3, Sancor Max 6 / Max Premium / Todo Riesgo.
+- El Norte TD: franquicia_tipo = "fija", franquicia_valor = monto fijo en pesos (ej: "$700.000")
+- FedPat TD3 y Sancor TR: franquicia_tipo = "porcentaje", franquicia_valor = porcentaje de la suma asegurada (ej: "10%")
+- Para TODOS los demás planes (B, B1, B2, C, C1, CF, A, A4, Max 1, Max 3, Max Totales, Max Incendio): franquicia_tipo = null, franquicia_valor = null
 
 REGLAS DE AJUSTE AUTOMATICO:
 - ajuste_automatico = true si el PDF menciona "ajuste automático", "ajuste de suma asegurada", "actualización automática" o similar
@@ -271,6 +273,11 @@ async function generarMensaje(req, res, apiKey) {
       // Precio
       msg += buildPrecioLinea(cob, E);
       msg += '\n';
+
+      // Beneficios exclusivos FedPat
+      if (comp === 'fedpat' && !cob.solo_tarjeta_credito) {
+        msg += buildBeneficiosFedpat(cob.codigo, E);
+      }
     }
 
     // Separador entre compañías en comparativa
@@ -344,8 +351,23 @@ function buildPrecioLinea(cob, E) {
 }
 
 // ─────────────────────────────────────────────
-// HELPER — bloque DA por compañía
+// HELPER — beneficios exclusivos FedPat
 // ─────────────────────────────────────────────
+function buildBeneficiosFedpat(codigo, E) {
+  const esCFull = ['CF', 'TD3'].includes(codigo);
+
+  let bloque = `\uD83C\uDF81 *Beneficio Exclusivo FedPat:*\n`;  // 🎁
+  bloque += `\uD83D\uDE91 Asistencia en viaje y a las personas\n`;  // 🚑
+  bloque += `\uD83E\uDE7A Accidentes personales ${esCFull ? 'conductor y asegurado' : 'conductor'}\n`;  // 🩺
+  if (esCFull) {
+    bloque += `\uD83D\uDCA5 Cristales, luneta, parabrisas y cerraduras\n`;  // 💥
+  }
+  bloque += `\uD83D\uDCCB Gestoría en caso de robo o destrucción total\n`;  // 📋
+  bloque += `\u2696\uFE0F Asesoramiento legal 24hs\n`;  // ⚖️
+  bloque += '\n';
+
+  return bloque;
+}
 function buildBloqueDA(comp, cobs, E) {
   // Si todas las coberturas son solo_tarjeta_credito, el bloque DA ya está inline en cada precio
   const todasSoloTarjeta = cobs.every(c => c.solo_tarjeta_credito === true);
