@@ -137,10 +137,11 @@ REGLAS DE FRANQUICIA:
 - Para TODOS los demás planes (B, B1, B2, C, C1, CF, A, A4, Max 1, Max 3, Max Totales, Max Incendio): franquicia_tipo = null, franquicia_valor = null
 
 REGLAS DE COBERTURAS:
+- El campo "nombre" debe ser el nombre comercial limpio del plan según la BASE DE CONOCIMIENTO, NO el texto literal del PDF (ej: "Plan B" no "PLAN B RC.PERD TOTAL Accid. Inc. y Robo").
 - El campo "cubre" debe contener EXACTAMENTE los items definidos en la BASE DE CONOCIMIENTO para ese plan.
 - NO agregar coberturas adicionales que aparezcan en el PDF como beneficios generales (asistencia, accidentes personales, gestoría, etc.) — esos se manejan por separado.
 - NO duplicar coberturas ni agregar variantes.
-- La grúa NO va en el array "cubre" — va en el campo "grua_km".
+- La grúa NO va en el array "cubre" — va en el campo "grua_km" con solo los kilómetros o la palabra "incluida" si no especifica km (ej: "300km", "incluida").
 - ajuste_automatico = true si el PDF menciona "ajuste automático", "ajuste de suma asegurada", "actualización automática" o similar
 - ajuste_automatico = false si no lo menciona
 - Aplica a las tres compañías
@@ -245,19 +246,28 @@ async function generarMensaje(req, res, apiKey) {
       msg += '\n';
     }
 
-    for (const cob of cobsDeComp) {
+    for (const [idx, cob] of cobsDeComp.entries()) {
       const esRecomendado = cob.todo_riesgo === true;
+      const esUnica = cobsDeComp.length === 1;
+      const numOpcion = idx + 1;
 
       // Título
-      if (esRecomendado) {
-        msg += `${E.estrella} *Opción ${cob.codigo} — ${cob.nombre} — RECOMENDADO*\n`;
+      if (esUnica) {
+        const titulo = esRecomendado ? `${cob.nombre} — RECOMENDADO` : cob.nombre;
+        msg += `${esRecomendado ? E.estrella : E.escudo} *${titulo}*\n`;
       } else {
-        msg += `${E.escudo} *Opción ${cob.codigo} — ${cob.nombre}*\n`;
+        const titulo = esRecomendado
+          ? `Opción ${numOpcion} — ${cob.nombre} — RECOMENDADO`
+          : `Opción ${numOpcion} — ${cob.nombre}`;
+        msg += `${esRecomendado ? E.estrella : E.escudo} *${titulo}*\n`;
       }
 
       // Coberturas en una línea + Grúa
       const itemsCubre = [...(cob.cubre || [])];
-      if (cob.grua_km) itemsCubre.push(`Grúa ${cob.grua_km}`);
+      if (cob.grua_km) {
+        const kmLabel = cob.grua_km === 'incluida' ? '' : ` ${cob.grua_km}`;
+        itemsCubre.push(`\uD83D\uDD27 Asistencia con grúa${kmLabel}`);  // 🔧
+      }
       msg += `${E.check} ${itemsCubre.join(' + ')}\n`;
 
       // Ajuste automático de suma asegurada
