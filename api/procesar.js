@@ -48,7 +48,6 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).end(JSON.stringify({ error: 'Falta GEMINI_API_KEY' }));
 
   const { accion } = req.body;
-
   try {
     if (accion === 'analizar') return await analizarPDFs(req, res, apiKey);
     if (accion === 'generar')  return await generarMensaje(req, res, apiKey);
@@ -67,8 +66,9 @@ async function analizarPDFs(req, res, apiKey) {
     inlineData: { data: pdf.base64, mimeType: 'application/pdf' }
   }));
 
+  // Prompt mejorado para evitar texto extra
   parts.push({
-    text: `Sos un extractor de datos de seguros. Usa la BASE DE CONOCIMIENTO: ${JSON.stringify(BASE)}. Devuelve SOLO un JSON con vehiculo y coberturas.`
+    text: `Extrae los datos de este seguro. BASE: ${JSON.stringify(BASE)}. Responde EXCLUSIVAMENTE con un objeto JSON. No escribas nada fuera de las llaves. Ejemplo: {"vehiculo": {"descripcion": "..."}, "coberturas": [...]}`
   });
 
   const geminiBody = {
@@ -76,16 +76,25 @@ async function analizarPDFs(req, res, apiKey) {
     generationConfig: { maxOutputTokens: 2000, temperature: 0.1 }
   };
 
-  const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
-  );
+  const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(geminiBody)
+  });
 
   const geminiData = await geminiRes.json();
   const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const jsonMatch = texto.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No se encontró JSON en la respuesta de la IA.');
-  const cotizacion = JSON.parse(jsonMatch[0]);
+  
+  // Limpiador de JSON más potente (elimina bloques de código Markdown si los hay)
+  const cleanJson = texto.replace(/```json/g, '').replace(/```/g, '').trim();
+  const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
+  
+  if (!jsonMatch) {
+    console.error("Texto recibido de IA:", texto);
+    throw new Error('La IA no generó un formato de datos válido.');
+  }
 
+  const cotizacion = JSON.parse(jsonMatch[0]);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.status(200).end(Buffer.from(JSON.stringify(cotizacion), 'utf8'));
 }
@@ -137,6 +146,7 @@ async function generarMensaje(req, res, apiKey) {
       if (cob.grua_km) itemsCubre.push(`🔧 Asistencia con grúa ${cob.grua_km === 'incluida' ? '' : cob.grua_km}`);
       msg += `${E.check} ${itemsCubre.join(' + ')}\n`;
 
+      // AJUSTE AUTOMÁTICO: No mostrar para Plan A
       if (cob.ajuste_automatico && !['A', 'A4', 'Max 1'].includes(cob.codigo)) {
         msg += `📈 *Suma asegurada con ajuste automático*\n`;
       }
@@ -166,7 +176,6 @@ function buildPrecioLinea(cob, E) {
   const cuatri = formatPrecio(cob.precio_cuatrimestral);
   const semest = formatPrecio(cob.precio_semestral);
   const contado = formatPrecio(cob.precio_contado);
-  const mensual = formatPrecio(cob.precio_mensual);
 
   if (cob.solo_tarjeta_credito) {
     let l = contado ? `${E.dinero} *Contado: ${contado}*\n` : '';
@@ -176,7 +185,7 @@ function buildPrecioLinea(cob, E) {
 
   if (comp === 'norte') return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
   if (comp === 'fedpat') return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
-  return mensual ? `${E.dinero} *${mensual}/mes*\n` : '';
+  return formatPrecio(cob.precio_mensual) ? `${E.dinero} *${formatPrecio(cob.precio_mensual)}/mes*\n` : '';
 }
 
 function formatPrecio(v) { 
