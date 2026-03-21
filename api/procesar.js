@@ -89,11 +89,11 @@ Devuelve SOLO un JSON válido sin markdown ni backticks:
     "valor": "$XX.XXX.XXX o null",
     "ubicacion": "Ciudad"
   },
-  "numero_cotizacion": "número exacto del PDF o null",
   "coberturas": [
     {
       "id": "norte_B_1",
       "compania": "norte",
+      "numero_cotizacion": "3.301.449",
       "codigo": "B",
       "nombre": "Plan B",
       "todo_riesgo": false,
@@ -177,9 +177,12 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 - solo_tarjeta_credito = false para todos los demás planes
 
 ── NÚMERO DE COTIZACIÓN ──
-- El Norte: número grande junto a "Cotización" (ej: "3.301.449")
+- El número de cotización va DENTRO de cada cobertura, no en la raíz
+- Si el PDF tiene varias coberturas, todas comparten el mismo número de cotización de ese PDF
+- El Norte: número junto a "Cotización" (ej: "3.301.449")
 - FedPat: número junto a "Cotización" (ej: "286667905")
 - Sancor: número junto a "Cotización" (ej: "0190753302")
+- Si hay dos PDFs de distintas compañías, cada cobertura lleva el número de su propio PDF
 
 Si el PDF tiene varias coberturas, crear una entrada por cada una con id único.
 RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no agregués nada extra.` });
@@ -220,8 +223,6 @@ async function generarMensaje(req, res, apiKey) {
   const nombre = nombreCliente || 'cliente';
   const companias = [...new Set(coberturas.map(c => c.compania))];
   const hayMultiCompania = companias.length > 1;
-
-  // Emojis como escape sequences Unicode
   const E = {
     saludo:  '\uD83D\uDC4B',  // 👋
     auto:    '\uD83D\uDE97',  // 🚗
@@ -245,9 +246,6 @@ async function generarMensaje(req, res, apiKey) {
   const EMOJI_COMP = { norte: E.norte, fedpat: E.fedpat, sancor: E.sancor };
   const NOMBRE_COMP = { norte: 'El Norte Seguros', fedpat: 'Federación Patronal', sancor: 'Sancor Seguros' };
 
-  // Número de cotización — usar el del vehiculo si viene, o el del primer grupo
-  const numeroCotizacion = vehiculo.numero_cotizacion || null;
-
   let msg = '';
 
   // ── ENCABEZADO ──
@@ -259,18 +257,23 @@ async function generarMensaje(req, res, apiKey) {
   }
 
   msg += `${E.auto} *${vehiculo.descripcion.toUpperCase()}*\n`;
-  if (numeroCotizacion && !hayMultiCompania) {
-    msg += `${E.cotiz} *Cotización N° ${numeroCotizacion}*\n`;
+
+  // En una sola compañía el número de cotización va en el encabezado
+  if (!hayMultiCompania) {
+    const numCot = coberturas[0]?.numero_cotizacion || null;
+    if (numCot) msg += `${E.cotiz} *Cotización N° ${numCot}*\n`;
   }
   msg += '\n';
 
   // ── COBERTURAS POR COMPAÑÍA ──
   for (const comp of companias) {
     const cobsDeComp = coberturas.filter(c => c.compania === comp);
+    // Número de cotización de esta compañía (todas las coberturas de la misma compañía tienen el mismo número)
+    const numCotComp = cobsDeComp[0]?.numero_cotizacion || null;
 
     if (hayMultiCompania) {
       msg += `${EMOJI_COMP[comp]} *${NOMBRE_COMP[comp].toUpperCase()}*\n`;
-      if (numeroCotizacion) msg += `${E.cotiz} *Cotización N° ${numeroCotizacion}*\n`;
+      if (numCotComp) msg += `${E.cotiz} *Cotización N° ${numCotComp}*\n`;
       msg += '\n';
     }
 
