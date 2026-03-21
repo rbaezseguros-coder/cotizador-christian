@@ -100,6 +100,7 @@ Devuelve SOLO un JSON valido sin markdown ni backticks:
       "solo_tarjeta_credito": false,
       "franquicia_tipo": "fija o porcentaje o null",
       "franquicia_valor": "$700.000 o 10% o null",
+      "ajuste_automatico": true,
       "grua_km": "300km o null",
       "precio_cuatrimestral": "$xxx.xxx o null",
       "precio_semestral": "$xxx.xxx o null",
@@ -128,9 +129,15 @@ SANCOR (facturacion mensual):
 - precio_contado = null / precio_cuatrimestral = null / precio_semestral = null
 
 REGLAS DE FRANQUICIA:
+- La franquicia es el monto que paga el asegurado en caso de siniestro. NO confundir con ajuste de suma asegurada.
 - El Norte: franquicia_tipo = "fija", franquicia_valor = monto en pesos (ej: "$700.000")
 - FedPat y Sancor: franquicia_tipo = "porcentaje", franquicia_valor = porcentaje (ej: "10%")
-- Sin franquicia: ambos null
+- Si no tiene franquicia real de siniestro: ambos null
+
+REGLAS DE AJUSTE AUTOMATICO:
+- ajuste_automatico = true si el PDF menciona "ajuste automático", "ajuste de suma asegurada", "actualización automática" o similar
+- ajuste_automatico = false si no lo menciona
+- Aplica a las tres compañías
 
 REGLAS TODO RIESGO:
 - todo_riesgo = true: Norte D, FedPat TD3, Sancor Max 6 / Max Premium / Todo Riesgo
@@ -246,6 +253,11 @@ async function generarMensaje(req, res, apiKey) {
       const itemsCubre = [...(cob.cubre || [])];
       if (cob.grua_km) itemsCubre.push(`Grúa ${cob.grua_km}`);
       msg += `${E.check} ${itemsCubre.join(' + ')}\n`;
+
+      // Ajuste automático de suma asegurada
+      if (cob.ajuste_automatico) {
+        msg += `\uD83D\uDCC8 *Suma asegurada con ajuste automático*\n`;  // 📈
+      }
 
       // Franquicia
       if (cob.franquicia_valor) {
