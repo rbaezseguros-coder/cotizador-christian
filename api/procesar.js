@@ -63,15 +63,20 @@ async function analizarPDFs(req, res, apiKey) {
   const { pdfs } = req.body;
   if (!pdfs || !pdfs.length) return res.status(400).end(JSON.stringify({ error: 'No se recibieron PDFs' }));
 
-  const parts = pdfs.map(pdf => ({ inlineData: { data: pdf.base64, mimeType: 'application/pdf' } }));
-  parts.push({ text: `Sos un extractor de datos de seguros. Usa la BASE DE CONOCIMIENTO: ${JSON.stringify(BASE)}. Devuelve SOLO un JSON con vehiculo y coberturas.` });
+  const parts = pdfs.map(pdf => ({
+    inlineData: { data: pdf.base64, mimeType: 'application/pdf' }
+  }));
+
+  parts.push({
+    text: `Sos un extractor de datos de seguros. Usa la BASE DE CONOCIMIENTO: ${JSON.stringify(BASE)}. Devuelve SOLO un JSON con vehiculo y coberturas.`
+  });
 
   const geminiBody = {
-    contents: [{ parts }],
+    contents: [{ parts: parts }],
     generationConfig: { maxOutputTokens: 2000, temperature: 0.1 }
   };
 
-  const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+  const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
   );
 
@@ -158,8 +163,10 @@ async function generarMensaje(req, res, apiKey) {
 
 function buildPrecioLinea(cob, E) {
   const comp = cob.compania;
-  const cuatri = formatPrecio(cob.precio_cuatrimestral), semest = formatPrecio(cob.precio_semestral);
-  const contado = formatPrecio(cob.precio_contado), mensual = formatPrecio(cob.precio_mensual);
+  const cuatri = formatPrecio(cob.precio_cuatrimestral);
+  const semest = formatPrecio(cob.precio_semestral);
+  const contado = formatPrecio(cob.precio_contado);
+  const mensual = formatPrecio(cob.precio_mensual);
 
   if (cob.solo_tarjeta_credito) {
     let l = contado ? `${E.dinero} *Contado: ${contado}*\n` : '';
