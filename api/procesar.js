@@ -136,7 +136,11 @@ REGLAS DE FRANQUICIA:
 - FedPat TD3 y Sancor TR: franquicia_tipo = "porcentaje", franquicia_valor = porcentaje de la suma asegurada (ej: "10%")
 - Para TODOS los demás planes (B, B1, B2, C, C1, CF, A, A4, Max 1, Max 3, Max Totales, Max Incendio): franquicia_tipo = null, franquicia_valor = null
 
-REGLAS DE AJUSTE AUTOMATICO:
+REGLAS DE COBERTURAS:
+- El campo "cubre" debe contener EXACTAMENTE los items definidos en la BASE DE CONOCIMIENTO para ese plan.
+- NO agregar coberturas adicionales que aparezcan en el PDF como beneficios generales (asistencia, accidentes personales, gestoría, etc.) — esos se manejan por separado.
+- NO duplicar coberturas ni agregar variantes.
+- La grúa NO va en el array "cubre" — va en el campo "grua_km".
 - ajuste_automatico = true si el PDF menciona "ajuste automático", "ajuste de suma asegurada", "actualización automática" o similar
 - ajuste_automatico = false si no lo menciona
 - Aplica a las tres compañías
@@ -298,53 +302,58 @@ async function generarMensaje(req, res, apiKey) {
 }
 
 // ─────────────────────────────────────────────
-// HELPER — línea de precio
+// HELPER — formatear precio con separador de miles
 // ─────────────────────────────────────────────
+function formatPrecio(valor) {
+  if (!valor) return null;
+  // Extraer solo dígitos y coma/punto
+  const limpio = valor.toString().replace(/[^\d.,]/g, '');
+  // Convertir a número, eliminar decimales redondeando hacia arriba
+  const num = Math.ceil(parseFloat(limpio.replace(/\./g, '').replace(',', '.')));
+  if (isNaN(num)) return valor;
+  // Formatear con punto como separador de miles
+  return '$' + num.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+}
 function buildPrecioLinea(cob, E) {
   const comp = cob.compania;
-  const esTodoRiesgo    = cob.todo_riesgo === true;
-  const esSoloTarjeta   = cob.solo_tarjeta_credito === true;
+  const esTodoRiesgo  = cob.todo_riesgo === true;
+  const esSoloTarjeta = cob.solo_tarjeta_credito === true;
+
+  const cuatri  = formatPrecio(cob.precio_cuatrimestral);
+  const semest  = formatPrecio(cob.precio_semestral);
+  const contado = formatPrecio(cob.precio_contado);
+  const mensual = formatPrecio(cob.precio_mensual);
 
   if (comp === 'norte') {
     if (esSoloTarjeta) {
-      // Opción A: contado + cuotas solo DA Tarjeta de Crédito
       let l = '';
-      if (cob.precio_contado)        l += `${E.dinero} *Contado: ${cob.precio_contado}*\n`;
-      if (cob.precio_cuatrimestral)  l += `${E.tarjeta} *4 cuotas de ${cob.precio_cuatrimestral} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
+      if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
+      if (cuatri)  l += `${E.tarjeta} *4 cuotas de ${cuatri} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
       return l;
     }
     if (esTodoRiesgo) {
-      // Todo Riesgo Norte: solo cuotas, sin contado
-      return cob.precio_cuatrimestral ? `${E.dinero} *4 cuotas de ${cob.precio_cuatrimestral}*\n` : '';
+      return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
     }
-    // Resto Norte: cuotas + contado
-    let l = '';
-    if (cob.precio_cuatrimestral) l += `${E.dinero} *4 cuotas de ${cob.precio_cuatrimestral}*`;
-    if (cob.precio_contado)       l += ` / *Contado: ${cob.precio_contado}*`;
-    return l ? l + '\n' : '';
+    // Resto Norte: solo cuotas, sin contado
+    return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
   }
 
   if (comp === 'fedpat') {
     if (esSoloTarjeta) {
-      // A4: contado + cuotas solo DA Tarjeta de Crédito
       let l = '';
-      if (cob.precio_contado)   l += `${E.dinero} *Contado: ${cob.precio_contado}*\n`;
-      if (cob.precio_semestral) l += `${E.tarjeta} *6 cuotas de ${cob.precio_semestral} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
+      if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
+      if (semest)  l += `${E.tarjeta} *6 cuotas de ${semest} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
       return l;
     }
     if (esTodoRiesgo) {
-      // Todo Riesgo FedPat: solo cuotas, sin contado
-      return cob.precio_semestral ? `${E.dinero} *6 cuotas de ${cob.precio_semestral}*\n` : '';
+      return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
     }
-    // Resto FedPat: cuotas + contado
-    let l = '';
-    if (cob.precio_semestral) l += `${E.dinero} *6 cuotas de ${cob.precio_semestral}*`;
-    if (cob.precio_contado)   l += ` / *Contado: ${cob.precio_contado}*`;
-    return l ? l + '\n' : '';
+    // Resto FedPat: solo cuotas, sin contado
+    return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
   }
 
   if (comp === 'sancor') {
-    return cob.precio_mensual ? `${E.dinero} *${cob.precio_mensual}/mes*\n` : '';
+    return mensual ? `${E.dinero} *${mensual}/mes*\n` : '';
   }
 
   return '';
