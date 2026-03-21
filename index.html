@@ -94,10 +94,69 @@ input[type="file"] { display: none; }
 .tag-fedpat { background: var(--fedpat-light); color: var(--fedpat); border-color: var(--fedpat); }
 .tag-sancor { background: var(--sancor-light); color: var(--sancor); border-color: var(--sancor); }
 
-.precio-row { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
-.precio-label { font-size: 12px; font-weight: 600; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
-.precio-btn { padding: 6px 14px; border-radius: 6px; border: 1.5px solid var(--border2); background: var(--surface); color: var(--ink-dim); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: 'Barlow', sans-serif; text-transform: uppercase; }
-.precio-btn.sel { background: var(--ink); color: #fff; border-color: var(--ink); }
+/* ── SELECTORES DE PRECIO POR COMPAÑÍA ── */
+.precio-compania-wrap { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+
+.precio-compania-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  flex-wrap: wrap;
+  animation: fadeUp 0.2s ease;
+}
+.precio-compania-row.row-norte  { border-color: var(--norte);  background: var(--norte-light); }
+.precio-compania-row.row-fedpat { border-color: var(--fedpat); background: var(--fedpat-light); }
+.precio-compania-row.row-sancor { border-color: var(--sancor); background: var(--sancor-light); }
+
+.precio-comp-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  min-width: 110px;
+}
+.row-norte  .precio-comp-label { color: var(--norte); }
+.row-fedpat .precio-comp-label { color: var(--fedpat); }
+.row-sancor .precio-comp-label { color: var(--sancor); }
+
+.precio-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.precio-btn {
+  padding: 5px 13px;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  background: var(--surface);
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Barlow', sans-serif;
+  text-transform: uppercase;
+}
+.precio-btn:hover { background: var(--surface2); color: var(--ink); }
+
+/* Activo por compañía */
+.row-norte  .precio-btn.sel { background: var(--norte);  color: #fff; border-color: var(--norte); }
+.row-fedpat .precio-btn.sel { background: var(--fedpat); color: #fff; border-color: var(--fedpat); }
+.row-sancor .precio-btn.sel { background: var(--sancor); color: #fff; border-color: var(--sancor); }
+
+/* Sancor fijo: solo muestra el chip de "Mensual" sin botón */
+.precio-fixed-chip {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sancor);
+  background: rgba(255,255,255,0.6);
+  border: 1.5px solid var(--sancor);
+  border-radius: 6px;
+  padding: 5px 13px;
+  text-transform: uppercase;
+}
 
 .descuento-chip { background: #fff8e8; border: 1.5px solid #f0d898; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #8a6a00; margin-bottom: 22px; display: flex; align-items: center; gap: 8px; }
 
@@ -140,7 +199,7 @@ input[type="file"] { display: none; }
 .btn-secondary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; background: transparent; border: 1.5px solid var(--border2); color: var(--ink-dim); border-radius: var(--radius); padding: 12px; font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .btn-secondary:hover { border-color: var(--ink); color: var(--ink); }
 
-@media(max-width:480px){ .steps { display: none; } .panel { padding: 18px; } .precio-row { flex-direction: column; align-items: flex-start; } }
+@media(max-width:480px){ .steps { display: none; } .panel { padding: 18px; } .precio-compania-row { flex-direction: column; align-items: flex-start; } }
 </style>
 </head>
 <body>
@@ -161,6 +220,7 @@ input[type="file"] { display: none; }
     <div class="step-item" id="step3"><div class="step-num">3</div>Mensaje WhatsApp</div>
   </div>
 
+  <!-- PASO 1 -->
   <div class="panel active" id="panel1">
     <div class="panel-heading">Subí las cotizaciones</div>
     <div class="panel-sub">Arrastrá uno o más PDFs — de cualquier compañía. La IA los detecta automáticamente.</div>
@@ -186,6 +246,7 @@ input[type="file"] { display: none; }
     </button>
   </div>
 
+  <!-- PASO 2 -->
   <div class="panel" id="panel2">
     <div class="panel-heading">Elegí las coberturas</div>
     <div class="panel-sub">Seleccioná las que querés presentar. Podés mezclar compañías libremente.</div>
@@ -200,13 +261,8 @@ input[type="file"] { display: none; }
 
     <div class="company-tabs" id="companyTabs"></div>
 
-    <div class="precio-row">
-      <span class="precio-label">Precio:</span>
-      <button class="precio-btn sel" data-tipo="mensual" onclick="setPrecio('mensual')">Mensual</button>
-      <button class="precio-btn" data-tipo="semestral" onclick="setPrecio('semestral')">Semestral</button>
-      <button class="precio-btn" data-tipo="cuatrimestral" onclick="setPrecio('cuatrimestral')">Cuatrimestral</button>
-      <button class="precio-btn" data-tipo="contado" onclick="setPrecio('contado')">Contado</button>
-    </div>
+    <!-- Selectores de precio por compañía (se renderizan dinámicamente) -->
+    <div class="precio-compania-wrap" id="precioCompaniaWrap"></div>
 
     <div class="descuento-chip" id="descuentoNorte" style="display:none">
       💡 <strong>El Norte:</strong> 5% descuento adicional con débito automático (tarjeta/CBU)
@@ -225,6 +281,7 @@ input[type="file"] { display: none; }
     <button class="btn-secondary" onclick="irPaso(1)">← Volver y agregar más PDFs</button>
   </div>
 
+  <!-- PASO 3 -->
   <div class="panel" id="panel3">
     <div class="panel-heading">Mensaje listo ✓</div>
     <div class="panel-sub">Revisá, editá si querés y enviá por WhatsApp</div>
@@ -247,27 +304,63 @@ input[type="file"] { display: none; }
 <script>
 // ── STATE ──
 let archivos = [];
-let cotizacion = {vehiculo:null, coberturas:[]};
+let cotizacion = { vehiculo: null, coberturas: [] };
 let seleccionados = new Set();
-let tipoPrecio = 'mensual';
+
+// Opciones por compañía: null = sin selector (fijo)
+// norte/fedpat: 'cuotas' | 'contado'
+// sancor: siempre mensual
+const OPCIONES_PRECIO = {
+  norte:  ['cuotas', 'contado'],
+  fedpat: ['cuotas', 'contado'],
+  sancor: null
+};
+
+// Campo del JSON a usar según compañía y modo
+const CAMPO_PRECIO = {
+  norte:  { cuotas: 'precio_cuatrimestral', contado: 'precio_contado' },
+  fedpat: { cuotas: 'precio_semestral',     contado: 'precio_contado' },
+  sancor: { mensual: 'precio_mensual' }
+};
+
+// Label corto que aparece debajo del precio en la tarjeta
+const LABEL_PRECIO_CORTO = {
+  norte:  { cuotas: '/ cuota x4', contado: 'contado' },
+  fedpat: { cuotas: '/ cuota x6', contado: 'contado' },
+  sancor: { mensual: '/ mes' }
+};
+
+// Label largo para el mensaje generado
+const LABEL_PRECIO_LARGO = {
+  norte:  { cuotas: 'financiado en 4 cuotas mensuales', contado: 'contado' },
+  fedpat: { cuotas: 'financiado en 6 cuotas mensuales', contado: 'contado' },
+  sancor: { mensual: 'mensual' }
+};
+
+// Estado actual del modo por compañía
+let tipoPrecioPorCompania = {
+  norte:  'cuotas',
+  fedpat: 'cuotas',
+  sancor: 'mensual'  // fijo, no cambia
+};
 
 // ── FILE HANDLING ──
 function onDrop(e) {
   e.preventDefault();
   document.getElementById('dropzone').classList.remove('over');
-  const files = [...e.dataTransfer.files].filter(f=>f.type==='application/pdf');
-  if(!files.length){showStatus('status1','error','⚠️ Solo se aceptan archivos PDF');return;}
+  const files = [...e.dataTransfer.files].filter(f => f.type === 'application/pdf');
+  if (!files.length) { showStatus('status1', 'error', '⚠️ Solo se aceptan archivos PDF'); return; }
   agregarArchivos(files);
 }
 
 function onFiles(fileList) {
-  const files = [...fileList].filter(f=>f.type==='application/pdf');
+  const files = [...fileList].filter(f => f.type === 'application/pdf');
   agregarArchivos(files);
-  document.getElementById('fileInput').value='';
+  document.getElementById('fileInput').value = '';
 }
 
 function agregarArchivos(files) {
-  files.forEach(f=>{if(!archivos.find(a=>a.name===f.name))archivos.push(f);});
+  files.forEach(f => { if (!archivos.find(a => a.name === f.name)) archivos.push(f); });
   renderFilesList();
 }
 
@@ -276,246 +369,309 @@ function renderFilesList() {
   const dz = document.getElementById('dropzone');
   const addBtn = document.getElementById('addMoreBtn');
   const btnAnalizar = document.getElementById('btnAnalizar');
-  lista.innerHTML='';
-  if(archivos.length===0){dz.style.display='';addBtn.style.display='none';btnAnalizar.disabled=true;return;}
-  dz.style.display='none';addBtn.style.display='flex';btnAnalizar.disabled=false;
-  archivos.forEach((f,i)=>{
-    const div=document.createElement('div');
-    div.className='file-item';
-    div.innerHTML=`<div class="fi-icon">📄</div><div class="fi-info"><div class="fi-name">${f.name}</div><div class="fi-size">${(f.size/1024).toFixed(1)} KB</div></div><button class="fi-remove" onclick="quitarArchivo(${i})">✕</button>`;
+  lista.innerHTML = '';
+  if (archivos.length === 0) { dz.style.display = ''; addBtn.style.display = 'none'; btnAnalizar.disabled = true; return; }
+  dz.style.display = 'none'; addBtn.style.display = 'flex'; btnAnalizar.disabled = false;
+  archivos.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML = `<div class="fi-icon">📄</div><div class="fi-info"><div class="fi-name">${f.name}</div><div class="fi-size">${(f.size / 1024).toFixed(1)} KB</div></div><button class="fi-remove" onclick="quitarArchivo(${i})">✕</button>`;
     lista.appendChild(div);
   });
 }
 
 function quitarArchivo(i) {
-  archivos.splice(i,1);
+  archivos.splice(i, 1);
   renderFilesList();
-  if(archivos.length===0) document.getElementById('dropzone').style.display='';
+  if (archivos.length === 0) document.getElementById('dropzone').style.display = '';
 }
 
 // ── STATUS ──
-function showStatus(id,tipo,txt){const el=document.getElementById(id);el.className='status show '+tipo;el.innerHTML=txt;}
-function hideStatus(id){document.getElementById(id).className='status';}
+function showStatus(id, tipo, txt) { const el = document.getElementById(id); el.className = 'status show ' + tipo; el.innerHTML = txt; }
+function hideStatus(id) { document.getElementById(id).className = 'status'; }
 
 // ── STEPS ──
-function irPaso(n){
-  [1,2,3].forEach(i=>{
-    document.getElementById('panel'+i).classList.toggle('active',i===n);
-    const s=document.getElementById('step'+i);
-    s.classList.remove('active','done');
-    if(i===n)s.classList.add('active');
-    else if(i<n)s.classList.add('done');
+function irPaso(n) {
+  [1, 2, 3].forEach(i => {
+    document.getElementById('panel' + i).classList.toggle('active', i === n);
+    const s = document.getElementById('step' + i);
+    s.classList.remove('active', 'done');
+    if (i === n) s.classList.add('active');
+    else if (i < n) s.classList.add('done');
   });
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── ANALIZAR — llama al backend Vercel ──
+// ── ANALIZAR ──
 async function analizarTodo() {
-  if(!archivos.length) return;
-  const btn=document.getElementById('btnAnalizar');
-  btn.disabled=true;
-  btn.innerHTML='<div class="spinner"></div> Analizando PDFs...';
-  showStatus('status1','info',`⏳ Analizando ${archivos.length} PDF${archivos.length>1?'s':''}...`);
+  if (!archivos.length) return;
+  const btn = document.getElementById('btnAnalizar');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analizando PDFs...';
+  showStatus('status1', 'info', `⏳ Analizando ${archivos.length} PDF${archivos.length > 1 ? 's' : ''}...`);
 
   try {
     const pdfs = [];
-    for(const f of archivos){
+    for (const f of archivos) {
       const b64 = await toBase64(f);
-      pdfs.push({nombre: f.name, base64: b64});
+      pdfs.push({ nombre: f.name, base64: b64 });
     }
 
     const res = await fetch('/api/procesar', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({accion: 'analizar', pdfs})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'analizar', pdfs })
     });
 
-    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Error del servidor ('+res.status+')');}
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error del servidor (' + res.status + ')'); }
     const data = await res.json();
     cotizacion = data;
     mostrarCoberturas();
     irPaso(2);
     hideStatus('status1');
 
-  } catch(err){
+  } catch (err) {
     console.error(err);
-    showStatus('status1','error','❌ '+err.message);
+    showStatus('status1', 'error', '❌ ' + err.message);
   } finally {
-    btn.disabled=false;
-    btn.innerHTML='<span>✨ Analizar cotizaciones</span>';
+    btn.disabled = false;
+    btn.innerHTML = '<span>✨ Analizar cotizaciones</span>';
   }
 }
 
 // ── MOSTRAR COBERTURAS ──
 function mostrarCoberturas() {
-  const v=cotizacion.vehiculo;
-  document.getElementById('vcNombre').textContent=v.descripcion||'—';
-  document.getElementById('vcDetalle').textContent=[v.patente&&'Patente: '+v.patente,v.valor&&'Valor: '+v.valor,v.ubicacion].filter(Boolean).join(' · ');
-  const comps=[...new Set(cotizacion.coberturas.map(c=>c.compania))];
-  const nombres={norte:'El Norte',fedpat:'Fed. Patronal',sancor:'Sancor'};
-  document.getElementById('companyTabs').innerHTML=comps.map(c=>`<span class="company-tag tag-${c}">${nombres[c]||c}</span>`).join('');
-  document.getElementById('descuentoNorte').style.display=comps.includes('norte')?'flex':'none';
+  const v = cotizacion.vehiculo;
+  document.getElementById('vcNombre').textContent = v.descripcion || '—';
+  document.getElementById('vcDetalle').textContent = [
+    v.patente && 'Patente: ' + v.patente,
+    v.valor && 'Valor: ' + v.valor,
+    v.ubicacion
+  ].filter(Boolean).join(' · ');
+
+  const comps = [...new Set(cotizacion.coberturas.map(c => c.compania))];
+  const nombres = { norte: 'El Norte', fedpat: 'Fed. Patronal', sancor: 'Sancor' };
+  document.getElementById('companyTabs').innerHTML = comps.map(c =>
+    `<span class="company-tag tag-${c}">${nombres[c] || c}</span>`
+  ).join('');
+
+  document.getElementById('descuentoNorte').style.display = comps.includes('norte') ? 'flex' : 'none';
+
+  // Resetear precio por compañía
+  tipoPrecioPorCompania = { norte: 'cuotas', fedpat: 'cuotas', sancor: 'mensual' };
+
   seleccionados.clear();
+  renderPrecioSelectores(comps);
   renderCoberturas();
 }
 
-function getPrecio(c){
-  if(tipoPrecio==='mensual') return c.precio_mensual||'—';
-  if(tipoPrecio==='semestral') return c.precio_semestral||c.precio_mensual||'—';
-  if(tipoPrecio==='cuatrimestral') return c.precio_cuatrimestral||c.precio_mensual||'—';
-  if(tipoPrecio==='contado') return c.precio_contado||c.precio_mensual||'—';
-  return c.precio_mensual||'—';
-}
-function getLabelPrecio(){return{mensual:'/ mes',semestral:'/ semestre',cuatrimestral:'/ cuota x4',contado:'contado'}[tipoPrecio]||'/ mes';}
+// ── SELECTORES DE PRECIO POR COMPAÑÍA ──
+function renderPrecioSelectores(companias) {
+  // Si no se pasa el array, calcularlo de los seleccionados
+  if (!companias) {
+    companias = [...new Set(
+      cotizacion.coberturas
+        .filter(c => seleccionados.has(c.id))
+        .map(c => c.compania)
+    )];
+  }
 
-function renderCoberturas(){
-  const lista=document.getElementById('coberturasList');
-  lista.innerHTML='';
-  const nombres={norte:'El Norte',fedpat:'Fed. Patronal',sancor:'Sancor'};
-  cotizacion.coberturas.forEach(c=>{
-    const sel=seleccionados.has(c.id);
-    const div=document.createElement('div');
-    div.className='cob-card'+(sel?' selected':'');
-    div.onclick=()=>toggleCob(c.id);
-    div.innerHTML=`
+  const wrap = document.getElementById('precioCompaniaWrap');
+  wrap.innerHTML = '';
+
+  if (companias.length === 0) return;
+
+  const nombresDisplay = { norte: '🔵 El Norte', fedpat: '🔴 Fed. Patronal', sancor: '🟣 Sancor' };
+  const labelOpciones  = { cuotas: 'En cuotas', contado: 'Contado', mensual: 'Mensual' };
+
+  companias.forEach(comp => {
+    const row = document.createElement('div');
+    row.className = `precio-compania-row row-${comp}`;
+    row.id = `precio-row-${comp}`;
+
+    const label = document.createElement('span');
+    label.className = 'precio-comp-label';
+    label.textContent = nombresDisplay[comp] || comp;
+    row.appendChild(label);
+
+    const opciones = OPCIONES_PRECIO[comp];
+
+    if (!opciones) {
+      // Sancor: chip fijo sin selector
+      const chip = document.createElement('span');
+      chip.className = 'precio-fixed-chip';
+      chip.textContent = 'Mensual';
+      row.appendChild(chip);
+    } else {
+      const btns = document.createElement('div');
+      btns.className = 'precio-btns';
+      opciones.forEach(tipo => {
+        const btn = document.createElement('button');
+        btn.className = 'precio-btn' + (tipoPrecioPorCompania[comp] === tipo ? ' sel' : '');
+        btn.textContent = labelOpciones[tipo] || tipo;
+        btn.onclick = () => setPrecioCompania(comp, tipo);
+        btns.appendChild(btn);
+      });
+      row.appendChild(btns);
+    }
+
+    wrap.appendChild(row);
+  });
+}
+
+function setPrecioCompania(comp, tipo) {
+  tipoPrecioPorCompania[comp] = tipo;
+  // Actualizar botones del row correspondiente
+  const row = document.getElementById(`precio-row-${comp}`);
+  if (row) {
+    row.querySelectorAll('.precio-btn').forEach(btn => {
+      btn.classList.toggle('sel', btn.textContent.toLowerCase() === tipo);
+    });
+  }
+  // Re-renderizar coberturas para actualizar precios mostrados
+  if (cotizacion.coberturas.length) renderCoberturas();
+}
+
+// ── GET PRECIO de una cobertura según el selector de su compañía ──
+function getPrecio(c) {
+  const modo = tipoPrecioPorCompania[c.compania] || 'mensual';
+  const campo = (CAMPO_PRECIO[c.compania] || {})[modo];
+  if (campo && c[campo]) return c[campo];
+  // fallback: si no hay dato, mostrar mensual
+  return c.precio_mensual || '—';
+}
+
+function getLabelPrecio(comp) {
+  const modo = tipoPrecioPorCompania[comp] || 'mensual';
+  return (LABEL_PRECIO_CORTO[comp] || {})[modo] || '/ mes';
+}
+
+// ── RENDER COBERTURAS ──
+function renderCoberturas() {
+  const lista = document.getElementById('coberturasList');
+  lista.innerHTML = '';
+  const nombres = { norte: 'El Norte', fedpat: 'Fed. Patronal', sancor: 'Sancor' };
+  cotizacion.coberturas.forEach(c => {
+    const sel = seleccionados.has(c.id);
+    const div = document.createElement('div');
+    div.className = 'cob-card' + (sel ? ' selected' : '');
+    div.onclick = () => toggleCob(c.id);
+    div.innerHTML = `
       <div class="cob-check"></div>
       <div class="cob-body">
         <div class="cob-top">
-          <span class="cob-badge badge-${c.compania}">${nombres[c.compania]||c.compania}</span>
-          <span class="cob-code">${c.codigo||''}</span>
-          <span class="cob-name">${c.nombre}${c.franquicia?' · '+c.franquicia:''}</span>
+          <span class="cob-badge badge-${c.compania}">${nombres[c.compania] || c.compania}</span>
+          <span class="cob-code">${c.codigo || ''}</span>
+          <span class="cob-name">${c.nombre}${c.franquicia ? ' · ' + c.franquicia : ''}</span>
         </div>
-        <div class="cob-sub">${(c.cubre||[]).slice(0,3).join(' · ')}</div>
+        <div class="cob-sub">${(c.cubre || []).slice(0, 3).join(' · ')}</div>
       </div>
       <div class="cob-precio">
         <div class="cob-precio-val">${getPrecio(c)}</div>
-        <div class="cob-precio-sub">${getLabelPrecio()}</div>
+        <div class="cob-precio-sub">${getLabelPrecio(c.compania)}</div>
       </div>`;
     lista.appendChild(div);
   });
   actualizarCounter();
 }
 
-function toggleCob(id){seleccionados.has(id)?seleccionados.delete(id):seleccionados.add(id);renderCoberturas();}
+function toggleCob(id) {
+  seleccionados.has(id) ? seleccionados.delete(id) : seleccionados.add(id);
 
-function setPrecio(tipo){
-  tipoPrecio=tipo;
-  document.querySelectorAll('.precio-btn').forEach(b=>b.classList.toggle('sel',b.dataset.tipo===tipo));
-  if(cotizacion.coberturas.length)renderCoberturas();
+  // Recalcular qué compañías tienen coberturas seleccionadas
+  const companiasSeleccionadas = [...new Set(
+    cotizacion.coberturas
+      .filter(c => seleccionados.has(c.id))
+      .map(c => c.compania)
+  )];
+
+  // Re-renderizar selectores solo con las compañías activas
+  renderPrecioSelectores(companiasSeleccionadas);
+  renderCoberturas();
 }
 
-function actualizarCounter(){
-  const n=seleccionados.size;
-  const counter=document.getElementById('selCounter');
-  const btn=document.getElementById('btnGenerar');
-  if(n===0){counter.innerHTML='Seleccioná al menos <strong>1 cobertura</strong>';btn.disabled=true;}
-  else if(n===1){counter.innerHTML='<strong>1 cobertura</strong> seleccionada — podés agregar más para comparar';btn.disabled=false;}
-  else{counter.innerHTML=`<strong>${n} coberturas</strong> seleccionadas ✓`;btn.disabled=false;}
+function actualizarCounter() {
+  const n = seleccionados.size;
+  const counter = document.getElementById('selCounter');
+  const btn = document.getElementById('btnGenerar');
+  if (n === 0) { counter.innerHTML = 'Seleccioná al menos <strong>1 cobertura</strong>'; btn.disabled = true; }
+  else if (n === 1) { counter.innerHTML = '<strong>1 cobertura</strong> seleccionada — podés agregar más para comparar'; btn.disabled = false; }
+  else { counter.innerHTML = `<strong>${n} coberturas</strong> seleccionadas ✓`; btn.disabled = false; }
 }
 
-// ── GENERAR MENSAJE — llama al backend Vercel ──
-async function generarMensaje(){
-  const sels=cotizacion.coberturas.filter(c=>seleccionados.has(c.id));
-  if(!sels.length)return;
-  const btn=document.getElementById('btnGenerar');
-  btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Generando...';
-  showStatus('status2','info','⏳ Generando mensaje...');
+// ── GENERAR MENSAJE ──
+async function generarMensaje() {
+  const sels = cotizacion.coberturas.filter(c => seleccionados.has(c.id));
+  if (!sels.length) return;
+  const btn = document.getElementById('btnGenerar');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Generando...';
+  showStatus('status2', 'info', '⏳ Generando mensaje...');
 
   try {
-    const compNombres={norte:'El Norte Seguros',fedpat:'Federación Patronal',sancor:'Sancor Seguros'};
-    const facturaciones={norte:'factura cada 4 meses (cuatrimestral)',fedpat:'factura cada 6 meses (semestral)',sancor:'factura mensual'};
-    const labelPrecio={mensual:'mensual',semestral:'semestral',cuatrimestral:'cuatrimestral (4 cuotas)',contado:'contado'}[tipoPrecio];
-    const hayMulti=new Set(sels.map(c=>c.compania)).size>1;
-
-    const datos=sels.map(c=>({
-      compania:compNombres[c.compania]||c.compania,
-      facturacion:facturaciones[c.compania]||'',
-      codigo:c.codigo,nombre:c.nombre,franquicia:c.franquicia||null,
-      precio:getPrecio(c),tipo_precio:labelPrecio,
-      cubre:c.cubre,no_cubre:c.no_cubre,
-      descuento:c.compania==='norte'?'5% adicional con débito automático (tarjeta/CBU)':null
-    }));
+    const hayMulti = new Set(sels.map(c => c.compania)).size > 1;
 
     const res = await fetch('/api/procesar', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         accion: 'generar',
         nombreCliente: document.getElementById('nombreCliente').value.trim() || 'cliente',
-        vehiculo: cotizacion.vehiculo,
-        coberturas: datos,
+        vehiculo: { ...cotizacion.vehiculo, numero_cotizacion: cotizacion.numero_cotizacion || null },
+        coberturas: sels,
         esComparativa: sels.length > 1,
-        hayMultiCompania: hayMulti,
-        tipoPrecio: labelPrecio
+        hayMultiCompania: hayMulti
       })
     });
 
-    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Error del servidor ('+res.status+')');}
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error del servidor (' + res.status + ')'); }
     const data = await res.json();
     const mensaje = data.mensaje || '';
 
-    const mensajeConEmojis = mensaje
-      .replace(/\[SALUDO\]/g, '\uD83D\uDE0A')
-      .replace(/\[AUTO\]/g, '\uD83D\uDE97')
-      .replace(/\[ESCUDO\]/g, '\uD83D\uDEE1\uFE0F')
-      .replace(/\[EMPRESA\]/g, '\uD83C\uDFE2')
-      .replace(/\[DINERO\]/g, '\uD83D\uDCB0')
-      .replace(/\[FRANQUICIA\]/g, '\uD83D\uDCCC')
-      .replace(/\[ESTRELLA\]/g, '\u2728')
-      .replace(/\[CHECK\]/g, '\u2714\uFE0F')
-      .replace(/\[DATOS\]/g, '\uD83D\uDCE3')
-      .replace(/\[PUNTO\]/g, '\uD83D\uDD37')
-      .replace(/\[TARJETA\]/g, '\uD83D\uDCB3')
-      .replace(/\[OK\]/g, '\uD83D\uDC4D')
-      .replace(/\[VERSUS\]/g, '\u2696\uFE0F');
-    
-    document.getElementById('resultBox').textContent=mensajeConEmojis;
+    document.getElementById('resultBox').textContent = mensaje;
     irPaso(3);
     hideStatus('status2');
 
-  } catch(err){
-    showStatus('status2','error','❌ '+err.message);
+  } catch (err) {
+    showStatus('status2', 'error', '❌ ' + err.message);
   } finally {
-    btn.disabled=false;btn.innerHTML='✍️ Generar mensaje';
+    btn.disabled = false; btn.innerHTML = '✍️ Generar mensaje';
   }
 }
 
-// FUNCIÓN PARA ENVIAR A WHATSAPP SIN QUE SE ROMPAN LOS EMOJIS
 function enviarAWhatsApp() {
-    const texto = document.getElementById('resultBox').textContent;
-    if(!texto) return;
-    
-    // Usamos encodeURIComponent sobre el texto limpio del recuadro
-    const url = "https://api.whatsapp.com/send?text=" + encodeURIComponent(texto);
-    window.open(url, '_blank');
+  const texto = document.getElementById('resultBox').textContent;
+  if (!texto) return;
+  const url = "https://api.whatsapp.com/send?text=" + encodeURIComponent(texto);
+  window.open(url, '_blank');
 }
 
 // ── HELPERS ──
-function toBase64(file){
-  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+function toBase64(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
 }
 
-function copiar(){
-  navigator.clipboard.writeText(document.getElementById('resultBox').textContent).then(()=>{
-    showStatus('status2','ok','📋 Copiado al portapapeles');
-    setTimeout(()=>hideStatus('status2'),2500);
+function copiar() {
+  navigator.clipboard.writeText(document.getElementById('resultBox').textContent).then(() => {
+    showStatus('status2', 'ok', '📋 Copiado al portapapeles');
+    setTimeout(() => hideStatus('status2'), 2500);
   });
 }
 
-function editar(){
-  const box=document.getElementById('resultBox');
-  const ed=box.contentEditable==='true';
-  box.contentEditable=ed?'false':'true';
-  box.style.outline=ed?'':'2px solid var(--norte)';
-  if(!ed){box.focus();showStatus('status2','info','✏️ Modo edición — tocá "Editar" de nuevo para salir');}
-  else{hideStatus('status2');}
+function editar() {
+  const box = document.getElementById('resultBox');
+  const ed = box.contentEditable === 'true';
+  box.contentEditable = ed ? 'false' : 'true';
+  box.style.outline = ed ? '' : '2px solid var(--norte)';
+  if (!ed) { box.focus(); showStatus('status2', 'info', '✏️ Modo edición — tocá "Editar" de nuevo para salir'); }
+  else { hideStatus('status2'); }
 }
 
-function nuevaCotizacion(){
-  archivos=[];cotizacion={vehiculo:null,coberturas:[]};seleccionados.clear();
-  document.getElementById('filesList').innerHTML='';
-  document.getElementById('dropzone').style.display='';
-  document.getElementById('addMoreBtn').style.display='none';
+function nuevaCotizacion() {
+  archivos = []; cotizacion = { vehiculo: null, coberturas: [] }; seleccionados.clear();
+  tipoPrecioPorCompania = { norte: 'cuotas', fedpat: 'cuotas', sancor: 'mensual' };
+  document.getElementById('dropzone').style.display = '';
+  document.getElementById('addMoreBtn').style.display = 'none';
+  document.getElementById('precioCompaniaWrap').innerHTML = '';
   irPaso(1);
 }
 </script>
