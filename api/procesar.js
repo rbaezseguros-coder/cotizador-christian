@@ -8,7 +8,7 @@ const BASE = {
       'B':  { cubre: ['Robo/Hurto e Incendio Total','Destrucción Total por Accidente','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
       'B2': { cubre: ['Robo/Hurto e Incendio Total y Parcial','Granizo','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Robo parcial','Daños por accidente'], todo_riesgo: false },
       'B1': { cubre: ['Robo/Hurto e Incendio Total','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
-      'A':  { cubre: ['Responsabilidad Civil por daños a terceros'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Granizo'], todo_riesgo: false, solo_tarjeta_credito: true },
+      'A':  { cubre: ['Responsabilidad Civil por daños a terceros'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Granizo'], todo_riesgo: false, solo_tarjeta_credito: true }
     }
   },
   fedpat: {
@@ -20,7 +20,7 @@ const BASE = {
       'C1':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Responsabilidad Civil','Grúa incluida'], no_cubre: ['Daños por accidente','Destrucción Total','Granizo'], todo_riesgo: false },
       'B':   { cubre: ['Robo/Hurto e Incendio Total','Destrucción Total','Responsabilidad Civil','Grúa incluida'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
       'B1':  { cubre: ['Robo/Hurto e Incendio Total','Responsabilidad Civil','Grúa incluida'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
-      'A4':  { cubre: ['Responsabilidad Civil límite máximo'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Grúa'], todo_riesgo: false, solo_tarjeta_credito: true },
+      'A4':  { cubre: ['Responsabilidad Civil límite máximo'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Grúa'], todo_riesgo: false, solo_tarjeta_credito: true }
     }
   },
   sancor: {
@@ -32,7 +32,7 @@ const BASE = {
       'Max Totales':  { cubre: ['Daños totales por accidente','Robo/Hurto e Incendio Total','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Robo parcial','Granizo','Daños parciales'], todo_riesgo: false },
       'Max 6':        { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Cristales','Cerraduras'], todo_riesgo: true },
       'Max Premium':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio','Inundación','Granizo','Cristales','Cerraduras','Responsabilidad Civil','Asistencia completa'], no_cubre: [], todo_riesgo: true },
-      'Todo Riesgo':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio','Inundación','Granizo','Cristales','Cerraduras','Responsabilidad Civil','Asistencia completa'], no_cubre: [], todo_riesgo: true },
+      'Todo Riesgo':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio','Inundación','Granizo','Cristales','Cerraduras','Responsabilidad Civil','Asistencia completa'], no_cubre: [], todo_riesgo: true }
     }
   }
 };
@@ -63,11 +63,7 @@ async function analizarPDFs(req, res, apiKey) {
   const { pdfs } = req.body;
   if (!pdfs || !pdfs.length) return res.status(400).end(JSON.stringify({ error: 'No se recibieron PDFs' }));
 
-  const parts = [];
-  for (const pdf of pdfs) {
-    parts.push({ inlineData: { data: pdf.base64, mimeType: 'application/pdf' } });
-  }
-
+  const parts = pdfs.map(pdf => ({ inlineData: { data: pdf.base64, mimeType: 'application/pdf' } }));
   parts.push({ text: `Sos un extractor de datos de seguros. Usa la BASE DE CONOCIMIENTO: ${JSON.stringify(BASE)}. Devuelve SOLO un JSON con vehiculo y coberturas.` });
 
   const geminiBody = {
@@ -82,6 +78,7 @@ async function analizarPDFs(req, res, apiKey) {
   const geminiData = await geminiRes.json();
   const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const jsonMatch = texto.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('No se encontró JSON en la respuesta de la IA.');
   const cotizacion = JSON.parse(jsonMatch[0]);
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
