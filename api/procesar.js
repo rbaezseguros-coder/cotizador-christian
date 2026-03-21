@@ -71,9 +71,9 @@ async function analizarPDFs(req, res, apiKey) {
     parts.push({ inlineData: { data: pdf.base64, mimeType: 'application/pdf' } });
   }
 
-  parts.push({ text: `Analiza los ${pdfs.length} PDFs de cotizaciones de seguros argentinos.
+  parts.push({ text: `Sos un extractor de datos de cotizaciones de seguros argentinos. Tu única tarea es extraer los datos del PDF y devolverlos en el formato JSON indicado. No agregues, no inferís, no completés con información que no esté explícitamente en el PDF.
 
-IDENTIFICACION DE COMPANIA:
+IDENTIFICACION DE COMPANIA — mirá el encabezado o logo del PDF:
 - "EL NORTE" o "elnorte.com.ar" → compania: "norte"
 - "FEDERACION PATRONAL" o "fedpat.com.ar" → compania: "fedpat"
 - "SANCOR SEGUROS" o "sancorseguros.com.ar" → compania: "sancor"
@@ -81,80 +81,108 @@ IDENTIFICACION DE COMPANIA:
 BASE DE CONOCIMIENTO DE PLANES:
 ${JSON.stringify(BASE, null, 2)}
 
-Devuelve SOLO un JSON valido sin markdown ni backticks:
+Devuelve SOLO un JSON válido sin markdown ni backticks:
 {
   "vehiculo": {
-    "descripcion": "Marca Modelo Anio",
-    "patente": "AAA111 o null",
-    "valor": "$XX.XXX.XXX",
+    "descripcion": "Marca Modelo Año — exactamente como figura en el PDF",
+    "patente": "ABC123 o null si no figura",
+    "valor": "$XX.XXX.XXX o null",
     "ubicacion": "Ciudad"
   },
-  "numero_cotizacion": "3.285.107 o null",
+  "numero_cotizacion": "número exacto del PDF o null",
   "coberturas": [
     {
-      "id": "norte_D_1",
+      "id": "norte_B_1",
       "compania": "norte",
-      "codigo": "D",
-      "nombre": "nombre completo del plan",
-      "todo_riesgo": true,
+      "codigo": "B",
+      "nombre": "Plan B",
+      "todo_riesgo": false,
       "solo_tarjeta_credito": false,
-      "franquicia_tipo": "fija o porcentaje o null",
-      "franquicia_valor": "$700.000 o 10% o null",
-      "ajuste_automatico": true,
-      "grua_km": "300km o null",
-      "precio_cuatrimestral": "$xxx.xxx o null",
-      "precio_semestral": "$xxx.xxx o null",
-      "precio_mensual": "$xxx.xxx o null",
-      "precio_contado": "$xxx.xxx o null",
-      "cubre": ["item1", "item2"],
-      "no_cubre": ["item1"]
+      "franquicia_tipo": null,
+      "franquicia_valor": null,
+      "ajuste_automatico": false,
+      "grua_km": "300km",
+      "precio_cuatrimestral": "$60.680",
+      "precio_semestral": null,
+      "precio_mensual": null,
+      "precio_contado": "$220.984",
+      "cubre": ["Robo/Hurto e Incendio Total", "Destrucción Total por Accidente", "Responsabilidad Civil"],
+      "no_cubre": ["Robo parcial", "Granizo", "Daños por accidente"]
     }
   ]
 }
 
-REGLAS DE PRECIOS:
+════════════════════════════════════════
+REGLAS ESTRICTAS — LEER CON ATENCIÓN
+════════════════════════════════════════
 
-EL NORTE (facturacion cuatrimestral):
-- precio_cuatrimestral = valor de CADA CUOTA MENSUAL
-- precio_contado = total de la factura cuatrimestral pagada de una vez
-- precio_semestral = null / precio_mensual = null
+── NOMBRE DEL PLAN ──
+- Usar SIEMPRE el nombre corto y limpio: "Plan B", "Plan C", "Plan D", "Plan TD3", "Max Totales", etc.
+- NUNCA copiar el texto largo del PDF como "PLAN B RC.PERD TOTAL Accid. Inc. y Robo"
+- El nombre limpio está en la BASE DE CONOCIMIENTO
 
-FEDERACION PATRONAL (facturacion semestral):
-- precio_semestral = valor de CADA CUOTA MENSUAL
-- precio_contado = total de la factura semestral pagada de una vez
-- precio_cuatrimestral = null / precio_mensual = null
+── COBERTURAS (campo "cubre") ──
+- Copiar EXACTAMENTE los items del campo "cubre" de la BASE DE CONOCIMIENTO para ese plan
+- NUNCA agregar coberturas extras que aparezcan en el PDF como beneficios generales
+- FedPat — estos textos NO van en "cubre": asistencia en viaje, accidentes personales, gestoría, asesoramiento legal, cristales, parabrisas, cerraduras — son beneficios generales de la compañía
+- El Norte — estos textos NO van en "cubre": FAMILIA PROTEGIDA, SOS, adicionales
+- La grúa NUNCA va en "cubre" — va en el campo "grua_km"
 
-SANCOR (facturacion mensual):
-- precio_mensual = importe mensual
-- precio_contado = null / precio_cuatrimestral = null / precio_semestral = null
+── GRÚA ──
+- El Norte: buscar "SOS XXXkm" en ADICIONALES → grua_km = "300km" (el número que figure)
+- FedPat: si dice "CON SERV. DE GRUA" → grua_km = "incluida"
+- Sancor: si dice "Asistencia al Vehículo y Personas" → grua_km = "incluida"
+- Si no menciona grúa → grua_km = null
 
-REGLAS DE FRANQUICIA:
-- La franquicia es el monto que paga el asegurado de su bolsillo en caso de siniestro parcial.
-- NO es lo mismo que ajuste automático de suma asegurada. Son conceptos distintos.
-- Solo tienen franquicia real los planes TODO RIESGO: Norte D, FedPat TD3, Sancor Max 6 / Max Premium / Todo Riesgo.
-- El Norte TD: franquicia_tipo = "fija", franquicia_valor = monto fijo en pesos (ej: "$700.000")
-- FedPat TD3 y Sancor TR: franquicia_tipo = "porcentaje", franquicia_valor = porcentaje de la suma asegurada (ej: "10%")
-- Para TODOS los demás planes (B, B1, B2, C, C1, CF, A, A4, Max 1, Max 3, Max Totales, Max Incendio): franquicia_tipo = null, franquicia_valor = null
+── AJUSTE AUTOMÁTICO ──
+- El Norte: buscar "Ajuste automático: XX%" → ajuste_automatico = true
+- FedPat: buscar "AJUSTE AUTOMATICO SUMA ASEG." → ajuste_automatico = true
+- Sancor: buscar "Contempla Ajuste Automático Sumas Aseguradas" → ajuste_automatico = true
+- Si no figura explícitamente → ajuste_automatico = false
+- IMPORTANTE: el ajuste automático NO es una franquicia. Son conceptos distintos. No pongas franquicia_valor cuando encuentres ajuste automático.
 
-REGLAS DE COBERTURAS:
-- El campo "nombre" debe ser el nombre comercial limpio del plan según la BASE DE CONOCIMIENTO, NO el texto literal del PDF (ej: "Plan B" no "PLAN B RC.PERD TOTAL Accid. Inc. y Robo").
-- El campo "cubre" debe contener EXACTAMENTE los items definidos en la BASE DE CONOCIMIENTO para ese plan.
-- NO agregar coberturas adicionales que aparezcan en el PDF como beneficios generales (asistencia, accidentes personales, gestoría, etc.) — esos se manejan por separado.
-- NO duplicar coberturas ni agregar variantes.
-- La grúa NO va en el array "cubre" — va en el campo "grua_km" con solo los kilómetros o la palabra "incluida" si no especifica km (ej: "300km", "incluida").
-- ajuste_automatico = true si el PDF menciona "ajuste automático", "ajuste de suma asegurada", "actualización automática" o similar
-- ajuste_automatico = false si no lo menciona
-- Aplica a las tres compañías
+── FRANQUICIA ──
+- La franquicia es el monto que paga el asegurado de su bolsillo ante un siniestro parcial
+- Solo tienen franquicia real: Norte Plan D, FedPat Plan TD3, Sancor Max 6/Max Premium/Todo Riesgo
+- FedPat: si "FRANQUICIA POR DAÑO" dice "No Aplica" o "$0" → franquicia_tipo = null, franquicia_valor = null
+- FedPat TD3: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje"
+- El Norte D: buscar monto fijo de franquicia → franquicia_tipo = "fija"
+- Para TODOS los demás planes → franquicia_tipo = null, franquicia_valor = null
+- Las aclaraciones generales de Sancor sobre "Franquicia/Deduc. Robo Parcial" al pie NO son franquicia del plan
 
-REGLAS TODO RIESGO:
-- todo_riesgo = true: Norte D, FedPat TD3, Sancor Max 6 / Max Premium / Todo Riesgo
-- todo_riesgo = false: resto
+── PRECIOS EL NORTE ──
+- El PDF muestra columnas: Contado | Financiado | 4 Cuotas de
+- precio_contado = columna "Contado" (ej: "$220.984")
+- precio_cuatrimestral = columna "4 Cuotas de" — es el valor de CADA cuota (ej: "$60.680")
+- El valor "Financiado" (total financiado) NO va en ningún campo — ignorarlo
+- precio_semestral = null, precio_mensual = null
 
-REGLAS SOLO TARJETA CREDITO:
-- solo_tarjeta_credito = true: Norte A, FedPat A4
-- solo_tarjeta_credito = false: resto
+── PRECIOS FEDPAT ──
+- El PDF muestra: "6 cuotas de $XXXXX" y "contado $XXXXXX"
+- precio_semestral = valor de CADA cuota (ej: "$73.320")
+- precio_contado = monto contado (ej: "$415.296")
+- precio_cuatrimestral = null, precio_mensual = null
 
-Si hay varias TD con distintas franquicias crear una entrada por cada una con id unico.` });
+── PRECIOS SANCOR ──
+- El PDF muestra: "Importe Mensual: $XX.XXX,XX"
+- precio_mensual = importe mensual redondeado sin decimales (ej: "$96.301")
+- precio_contado = null, precio_cuatrimestral = null, precio_semestral = null
+
+── TODO RIESGO ──
+- todo_riesgo = true ÚNICAMENTE: Norte D, FedPat TD3, Sancor Max 6/Max Premium/Todo Riesgo
+- todo_riesgo = false para todos los demás planes sin excepción
+
+── SOLO TARJETA CRÉDITO ──
+- solo_tarjeta_credito = true ÚNICAMENTE: Norte A, FedPat A4
+- solo_tarjeta_credito = false para todos los demás planes
+
+── NÚMERO DE COTIZACIÓN ──
+- El Norte: número grande junto a "Cotización" (ej: "3.301.449")
+- FedPat: número junto a "Cotización" (ej: "286667905")
+- Sancor: número junto a "Cotización" (ej: "0190753302")
+
+Si el PDF tiene varias coberturas, crear una entrada por cada una con id único.
+RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no agregués nada extra.` });
 
   const geminiBody = {
     contents: [{ parts }],
