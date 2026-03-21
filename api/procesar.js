@@ -1,4 +1,4 @@
-Const BASE = {
+const BASE = {
   norte: {
     nombre: 'El Norte Seguros', facturacion: 'cuatrimestral',
     planes: {
