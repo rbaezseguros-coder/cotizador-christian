@@ -187,9 +187,10 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 Si el PDF tiene varias coberturas, crear una entrada por cada una con id único.
 RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no agregués nada extra.` });
 
+  // ── FIX: maxOutputTokens subido a 8192 para evitar que Gemini corte el JSON a la mitad ──
   const geminiBody = {
     contents: [{ parts }],
-    generationConfig: { maxOutputTokens: 2000, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } }
+    generationConfig: { maxOutputTokens: 8192, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } }
   };
 
   const geminiRes = await fetch(
@@ -208,7 +209,17 @@ RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no ag
 
   const jsonMatch = texto.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('No se encontro JSON en la respuesta.');
-  const cotizacion = JSON.parse(jsonMatch[0]);
+
+  // ── FIX: mejor manejo de error en JSON.parse para facilitar diagnóstico en logs de Vercel ──
+  let cotizacion;
+  try {
+    cotizacion = JSON.parse(jsonMatch[0]);
+  } catch (parseErr) {
+    const pos = parseInt(parseErr.message.match(/position (\d+)/)?.[1] || '0');
+    const contexto = jsonMatch[0].slice(Math.max(0, pos - 100), pos + 100);
+    console.error('JSON invalido de Gemini en posicion', pos, '— contexto:', contexto);
+    throw new Error('Gemini devolvio un JSON invalido: ' + parseErr.message);
+  }
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.status(200).end(Buffer.from(JSON.stringify(cotizacion), 'utf8'));
@@ -355,6 +366,7 @@ function formatPrecio(valor) {
   // Formatear con punto como separador de miles
   return '$' + num.toLocaleString('es-AR', { maximumFractionDigits: 0 });
 }
+
 function buildPrecioLinea(cob, E) {
   const comp = cob.compania;
   const esTodoRiesgo  = cob.todo_riesgo === true;
@@ -418,6 +430,7 @@ function buildBeneficiosFedpat(codigo, E) {
 
   return bloque;
 }
+
 function buildBloqueDA(comp, cobs, E) {
   // Si todas las coberturas son solo_tarjeta_credito, el bloque DA ya está inline en cada precio
   const todasSoloTarjeta = cobs.every(c => c.solo_tarjeta_credito === true);
