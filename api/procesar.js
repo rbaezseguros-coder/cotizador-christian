@@ -188,7 +188,6 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 Si el PDF tiene varias coberturas, crear una entrada por cada una con id único.
 RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no agregués nada extra.` });
 
-  // maxOutputTokens en 8192 para evitar que Gemini corte el JSON a la mitad
   const geminiBody = {
     contents: [{ parts }],
     generationConfig: { maxOutputTokens: 8192, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } }
@@ -286,22 +285,23 @@ async function generarMensaje(req, res, apiKey) {
       msg += '\n';
     }
 
+    // ── FIX B: detectar si hay algún plan A/A4 en esta compañía ──
+    const hayPlanSoloTarjeta = cobsDeComp.some(c => c.solo_tarjeta_credito === true);
+    const hayPlanesNormales  = cobsDeComp.some(c => c.solo_tarjeta_credito !== true);
+
     for (const [idx, cob] of cobsDeComp.entries()) {
-      const esRecomendado = cob.todo_riesgo === true;
-      const esUnica = cobsDeComp.length === 1;
-      const numOpcion = idx + 1;
+      const esRecomendado  = cob.todo_riesgo === true;
+      const esSoloTarjeta  = cob.solo_tarjeta_credito === true;
+      const esUnica        = cobsDeComp.length === 1;
+      const numOpcion      = idx + 1;
 
       // ── NOMBRE DEL PLAN ──
-      // Planes todo riesgo: "Todo Riesgo — Franquicia Fija $X" (Norte) o "Todo Riesgo — Franquicia X%" (FedPat/Sancor)
-      // Resto de planes: nombre normal
       let nombrePlan;
       if (esRecomendado) {
         if (cob.franquicia_valor) {
-          if (cob.franquicia_tipo === 'fija') {
-            nombrePlan = `Todo Riesgo — Franquicia Fija ${cob.franquicia_valor}`;
-          } else {
-            nombrePlan = `Todo Riesgo — Franquicia ${cob.franquicia_valor}`;
-          }
+          nombrePlan = cob.franquicia_tipo === 'fija'
+            ? `Todo Riesgo — Franquicia Fija ${cob.franquicia_valor}`
+            : `Todo Riesgo — Franquicia ${cob.franquicia_valor}`;
         } else {
           nombrePlan = 'Todo Riesgo';
         }
@@ -320,17 +320,16 @@ async function generarMensaje(req, res, apiKey) {
       const itemsCubre = [...(cob.cubre || [])];
       if (cob.grua_km) {
         const kmLabel = cob.grua_km === 'incluida' ? '' : ` ${cob.grua_km}`;
-        itemsCubre.push(`\uD83D\uDD27 Asistencia con grúa${kmLabel}`);  // 🔧
+        itemsCubre.push(`\uD83D\uDD27 Asistencia con grúa${kmLabel}`);
       }
       msg += `${E.check} ${itemsCubre.join(' + ')}\n`;
 
-      // Ajuste automático
-      if (cob.ajuste_automatico) {
-        msg += `\uD83D\uDCC8 *Suma asegurada con ajuste automático*\n`;  // 📈
+      // ── FIX A: ajuste automático solo si no es plan solo tarjeta (A/A4) ──
+      if (cob.ajuste_automatico && !esSoloTarjeta) {
+        msg += `\uD83D\uDCC8 *Suma asegurada con ajuste automático*\n`;
       }
 
-      // Franquicia en línea 📌 — solo para planes NO todo riesgo que tengan franquicia
-      // (los todo riesgo ya la muestran en el título)
+      // Franquicia en línea 📌 — solo planes no todo riesgo con franquicia
       if (!esRecomendado && cob.franquicia_valor) {
         if (cob.franquicia_tipo === 'fija') {
           msg += `${E.franq} *Franquicia fija: ${cob.franquicia_valor}*\n`;
@@ -343,15 +342,24 @@ async function generarMensaje(req, res, apiKey) {
       msg += buildPrecioLinea(cob, E);
       msg += '\n';
 
+      // ── FIX B: bloque DA después de cada cobertura no-A/A4, solo si hay plan A/A4 en la misma compañía ──
+      if (hayPlanSoloTarjeta && hayPlanesNormales && !esSoloTarjeta) {
+        msg += buildBloqueDA(comp, E);
+      }
+
       // Beneficios exclusivos FedPat
-      if (comp === 'fedpat' && !cob.solo_tarjeta_credito) {
+      if (comp === 'fedpat' && !esSoloTarjeta) {
         msg += buildBeneficiosFedpat(cob.codigo, E);
       }
     }
 
+    // Separador entre compañías en comparativa multi-compañía
     if (hayMultiCompania) msg += '---\n\n';
 
-    msg += buildBloqueDA(comp, cobsDeComp, E);
+    // ── FIX B: bloque DA al final solo si NO hay plan A/A4 en la compañía ──
+    if (!hayPlanSoloTarjeta) {
+      msg += buildBloqueDA(comp, E);
+    }
   }
 
   // ── CIERRE ──
@@ -387,8 +395,9 @@ function buildPrecioLinea(cob, E) {
   if (comp === 'norte') {
     if (esSoloTarjeta) {
       let l = '';
+      // ── FIX C: aclaración entre paréntesis y sin negrita ──
       if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
-      if (cuatri)  l += `${E.tarjeta} *4 cuotas de ${cuatri} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
+      if (cuatri)  l += `${E.tarjeta} *4 cuotas de ${cuatri}* (solo mediante Débito Automático con Tarjeta de Crédito)\n`;
       return l;
     }
     return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
@@ -397,8 +406,9 @@ function buildPrecioLinea(cob, E) {
   if (comp === 'fedpat') {
     if (esSoloTarjeta) {
       let l = '';
+      // ── FIX C: aclaración entre paréntesis y sin negrita ──
       if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
-      if (semest)  l += `${E.tarjeta} *6 cuotas de ${semest} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
+      if (semest)  l += `${E.tarjeta} *6 cuotas de ${semest}* (solo mediante Débito Automático con Tarjeta de Crédito)\n`;
       return l;
     }
     return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
@@ -412,28 +422,9 @@ function buildPrecioLinea(cob, E) {
 }
 
 // ─────────────────────────────────────────────
-// HELPER — beneficios exclusivos FedPat
+// HELPER — bloque débito automático
 // ─────────────────────────────────────────────
-function buildBeneficiosFedpat(codigo, E) {
-  const esCFull = ['CF', 'TD3'].includes(codigo);
-
-  let bloque = `\uD83C\uDF81 *Beneficio Exclusivo FedPat:*\n`;  // 🎁
-  bloque += `\uD83D\uDE91 Asistencia en viaje y a las personas\n`;  // 🚑
-  bloque += `\uD83E\uDE7A Accidentes personales ${esCFull ? 'conductor y asegurado' : 'conductor'}\n`;  // 🩺
-  if (esCFull) {
-    bloque += `\uD83D\uDCA5 Cristales, luneta, parabrisas y cerraduras\n`;  // 💥
-  }
-  bloque += `\uD83D\uDCCB Gestoría en caso de robo o destrucción total\n`;  // 📋
-  bloque += `\u2696\uFE0F Asesoramiento legal 24hs\n`;  // ⚖️
-  bloque += '\n';
-
-  return bloque;
-}
-
-function buildBloqueDA(comp, cobs, E) {
-  const todasSoloTarjeta = cobs.every(c => c.solo_tarjeta_credito === true);
-  if (todasSoloTarjeta) return '';
-
+function buildBloqueDA(comp, E) {
   if (comp === 'norte') {
     return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día y 5% adicional de descuento*\n\n`;
   }
@@ -441,4 +432,23 @@ function buildBloqueDA(comp, cobs, E) {
     return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día*\n\n`;
   }
   return '';
+}
+
+// ─────────────────────────────────────────────
+// HELPER — beneficios exclusivos FedPat
+// ─────────────────────────────────────────────
+function buildBeneficiosFedpat(codigo, E) {
+  const esCFull = ['CF', 'TD3'].includes(codigo);
+
+  let bloque = `\uD83C\uDF81 *Beneficio Exclusivo FedPat:*\n`;
+  bloque += `\uD83D\uDE91 Asistencia en viaje y a las personas\n`;
+  bloque += `\uD83E\uDE7A Accidentes personales ${esCFull ? 'conductor y asegurado' : 'conductor'}\n`;
+  if (esCFull) {
+    bloque += `\uD83D\uDCA5 Cristales, luneta, parabrisas y cerraduras\n`;
+  }
+  bloque += `\uD83D\uDCCB Gestoría en caso de robo o destrucción total\n`;
+  bloque += `\u2696\uFE0F Asesoramiento legal 24hs\n`;
+  bloque += '\n';
+
+  return bloque;
 }
