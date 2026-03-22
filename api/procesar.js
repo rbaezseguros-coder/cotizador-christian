@@ -2,24 +2,24 @@ const BASE = {
   norte: {
     nombre: 'El Norte Seguros', facturacion: 'cuatrimestral',
     planes: {
-      'D':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Cristales y Cerraduras','Responsabilidad Civil','Grúa SOS'], no_cubre: [], todo_riesgo: true },
-      'C':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Granizo','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Daños por accidente'], todo_riesgo: false },
-      'C1': { cubre: ['Robo/Hurto e Incendio Total y Parcial','Granizo','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Daños por accidente','Destrucción Total'], todo_riesgo: false },
-      'B':  { cubre: ['Robo/Hurto e Incendio Total','Destrucción Total por Accidente','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
-      'B2': { cubre: ['Robo/Hurto e Incendio Total y Parcial','Granizo','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Robo parcial','Daños por accidente'], todo_riesgo: false },
-      'B1': { cubre: ['Robo/Hurto e Incendio Total','Responsabilidad Civil','Grúa SOS'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
+      'D':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Cristales y Cerraduras','Responsabilidad Civil'], no_cubre: [], todo_riesgo: true },
+      'C':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Granizo','Responsabilidad Civil'], no_cubre: ['Daños por accidente'], todo_riesgo: false },
+      'C1': { cubre: ['Robo/Hurto e Incendio Total y Parcial','Granizo','Responsabilidad Civil'], no_cubre: ['Daños por accidente','Destrucción Total'], todo_riesgo: false },
+      'B':  { cubre: ['Robo/Hurto e Incendio Total','Destrucción Total por Accidente','Responsabilidad Civil'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
+      'B2': { cubre: ['Robo/Hurto e Incendio Total y Parcial','Granizo','Responsabilidad Civil'], no_cubre: ['Robo parcial','Daños por accidente'], todo_riesgo: false },
+      'B1': { cubre: ['Robo/Hurto e Incendio Total','Responsabilidad Civil'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
       'A':  { cubre: ['Responsabilidad Civil por daños a terceros'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Granizo'], todo_riesgo: false, solo_tarjeta_credito: true },
     }
   },
   fedpat: {
     nombre: 'Federación Patronal', facturacion: 'semestral',
     planes: {
-      'TD3': { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Grúa incluida','Cristales y Cerraduras','Asistencia en viaje'], no_cubre: ['Granizo'], todo_riesgo: true },
-      'CF':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Responsabilidad Civil','Grúa incluida','Cristales y Cerraduras'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
-      'C':   { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Grúa incluida'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
-      'C1':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Responsabilidad Civil','Grúa incluida'], no_cubre: ['Daños por accidente','Destrucción Total','Granizo'], todo_riesgo: false },
-      'B':   { cubre: ['Robo/Hurto e Incendio Total','Destrucción Total','Responsabilidad Civil','Grúa incluida'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
-      'B1':  { cubre: ['Robo/Hurto e Incendio Total','Responsabilidad Civil','Grúa incluida'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
+      'TD3': { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Cristales y Cerraduras','Asistencia en viaje'], no_cubre: ['Granizo'], todo_riesgo: true },
+      'CF':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Responsabilidad Civil','Cristales y Cerraduras'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
+      'C':   { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
+      'C1':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Responsabilidad Civil'], no_cubre: ['Daños por accidente','Destrucción Total','Granizo'], todo_riesgo: false },
+      'B':   { cubre: ['Robo/Hurto e Incendio Total','Destrucción Total','Responsabilidad Civil'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
+      'B1':  { cubre: ['Robo/Hurto e Incendio Total','Responsabilidad Civil'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
       'A4':  { cubre: ['Responsabilidad Civil límite máximo'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Grúa'], todo_riesgo: false, solo_tarjeta_credito: true },
     }
   },
@@ -30,8 +30,8 @@ const BASE = {
       'Max 1':        { cubre: ['Responsabilidad Civil'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Asistencia','Granizo'], todo_riesgo: false },
       'Max 3':        { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
       'Max Totales':  { cubre: ['Daños totales por accidente','Robo/Hurto e Incendio Total','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Robo parcial','Granizo','Daños parciales'], todo_riesgo: false },
-      'Max 6':        { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Cristales','Cerraduras'], todo_riesgo: true },
-      'Max Premium':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio','Inundación','Granizo','Cristales','Cerraduras','Responsabilidad Civil','Asistencia completa'], no_cubre: [], todo_riesgo: true },
+      'Max 6':        { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Cristales','Cerraduras'], todo_riesgo: false },
+      'Max Premium':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio','Inundación','Granizo','Cristales','Cerraduras','Responsabilidad Civil','Asistencia completa'], no_cubre: [], todo_riesgo: false },
       'Todo Riesgo':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio','Inundación','Granizo','Cristales','Cerraduras','Responsabilidad Civil','Asistencia completa'], no_cubre: [], todo_riesgo: true },
     }
   }
@@ -143,10 +143,11 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 
 ── FRANQUICIA ──
 - La franquicia es el monto que paga el asegurado de su bolsillo ante un siniestro parcial
-- Solo tienen franquicia real: Norte Plan D, FedPat Plan TD3, Sancor Max 6/Max Premium/Todo Riesgo
+- Solo tienen franquicia real: Norte Plan D, FedPat Plan TD3, Sancor Todo Riesgo
 - FedPat: si "FRANQUICIA POR DAÑO" dice "No Aplica" o "$0" → franquicia_tipo = null, franquicia_valor = null
-- FedPat TD3: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje"
-- El Norte D: buscar monto fijo de franquicia → franquicia_tipo = "fija"
+- FedPat TD3: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje", franquicia_valor = "5%" (el % que figure)
+- El Norte D: buscar monto fijo de franquicia → franquicia_tipo = "fija", franquicia_valor = "$700.000" (el monto que figure)
+- Sancor Todo Riesgo: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje", franquicia_valor = "10%" (el % que figure)
 - Para TODOS los demás planes → franquicia_tipo = null, franquicia_valor = null
 - Las aclaraciones generales de Sancor sobre "Franquicia/Deduc. Robo Parcial" al pie NO son franquicia del plan
 
@@ -169,8 +170,8 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 - precio_contado = null, precio_cuatrimestral = null, precio_semestral = null
 
 ── TODO RIESGO ──
-- todo_riesgo = true ÚNICAMENTE: Norte D, FedPat TD3, Sancor Max 6/Max Premium/Todo Riesgo
-- todo_riesgo = false para todos los demás planes sin excepción
+- todo_riesgo = true ÚNICAMENTE: Norte D, FedPat TD3, Sancor Todo Riesgo
+- todo_riesgo = false para todos los demás planes sin excepción (incluyendo Sancor Max 6 y Max Premium)
 
 ── SOLO TARJETA CRÉDITO ──
 - solo_tarjeta_credito = true ÚNICAMENTE: Norte A, FedPat A4
@@ -187,7 +188,7 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 Si el PDF tiene varias coberturas, crear una entrada por cada una con id único.
 RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no agregués nada extra.` });
 
-  // ── FIX: maxOutputTokens subido a 8192 para evitar que Gemini corte el JSON a la mitad ──
+  // maxOutputTokens en 8192 para evitar que Gemini corte el JSON a la mitad
   const geminiBody = {
     contents: [{ parts }],
     generationConfig: { maxOutputTokens: 8192, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } }
@@ -210,7 +211,6 @@ RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no ag
   const jsonMatch = texto.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('No se encontro JSON en la respuesta.');
 
-  // ── FIX: mejor manejo de error en JSON.parse para facilitar diagnóstico en logs de Vercel ──
   let cotizacion;
   try {
     cotizacion = JSON.parse(jsonMatch[0]);
@@ -269,7 +269,6 @@ async function generarMensaje(req, res, apiKey) {
 
   msg += `${E.auto} *${vehiculo.descripcion.toUpperCase()}*\n`;
 
-  // En una sola compañía el número de cotización va en el encabezado
   if (!hayMultiCompania) {
     const numCot = coberturas[0]?.numero_cotizacion || null;
     if (numCot) msg += `${E.cotiz} *Cotización N° ${numCot}*\n`;
@@ -279,7 +278,6 @@ async function generarMensaje(req, res, apiKey) {
   // ── COBERTURAS POR COMPAÑÍA ──
   for (const comp of companias) {
     const cobsDeComp = coberturas.filter(c => c.compania === comp);
-    // Número de cotización de esta compañía (todas las coberturas de la misma compañía tienen el mismo número)
     const numCotComp = cobsDeComp[0]?.numero_cotizacion || null;
 
     if (hayMultiCompania) {
@@ -293,15 +291,29 @@ async function generarMensaje(req, res, apiKey) {
       const esUnica = cobsDeComp.length === 1;
       const numOpcion = idx + 1;
 
+      // ── NOMBRE DEL PLAN ──
+      // Planes todo riesgo: "Todo Riesgo — Franquicia Fija $X" (Norte) o "Todo Riesgo — Franquicia X%" (FedPat/Sancor)
+      // Resto de planes: nombre normal
+      let nombrePlan;
+      if (esRecomendado) {
+        if (cob.franquicia_valor) {
+          if (cob.franquicia_tipo === 'fija') {
+            nombrePlan = `Todo Riesgo — Franquicia Fija ${cob.franquicia_valor}`;
+          } else {
+            nombrePlan = `Todo Riesgo — Franquicia ${cob.franquicia_valor}`;
+          }
+        } else {
+          nombrePlan = 'Todo Riesgo';
+        }
+      } else {
+        nombrePlan = cob.nombre;
+      }
+
       // Título
       if (esUnica) {
-        const titulo = esRecomendado ? `${cob.nombre} — RECOMENDADO` : cob.nombre;
-        msg += `${esRecomendado ? E.estrella : E.escudo} *${titulo}*\n`;
+        msg += `${esRecomendado ? E.estrella : E.escudo} *${nombrePlan}*\n`;
       } else {
-        const titulo = esRecomendado
-          ? `Opción ${numOpcion} — ${cob.nombre} — RECOMENDADO`
-          : `Opción ${numOpcion} — ${cob.nombre}`;
-        msg += `${esRecomendado ? E.estrella : E.escudo} *${titulo}*\n`;
+        msg += `${esRecomendado ? E.estrella : E.escudo} *Opción ${numOpcion} — ${nombrePlan}*\n`;
       }
 
       // Coberturas en una línea + Grúa
@@ -312,13 +324,14 @@ async function generarMensaje(req, res, apiKey) {
       }
       msg += `${E.check} ${itemsCubre.join(' + ')}\n`;
 
-      // Ajuste automático de suma asegurada
+      // Ajuste automático
       if (cob.ajuste_automatico) {
         msg += `\uD83D\uDCC8 *Suma asegurada con ajuste automático*\n`;  // 📈
       }
 
-      // Franquicia
-      if (cob.franquicia_valor) {
+      // Franquicia en línea 📌 — solo para planes NO todo riesgo que tengan franquicia
+      // (los todo riesgo ya la muestran en el título)
+      if (!esRecomendado && cob.franquicia_valor) {
         if (cob.franquicia_tipo === 'fija') {
           msg += `${E.franq} *Franquicia fija: ${cob.franquicia_valor}*\n`;
         } else if (cob.franquicia_tipo === 'porcentaje') {
@@ -336,10 +349,8 @@ async function generarMensaje(req, res, apiKey) {
       }
     }
 
-    // Separador entre compañías en comparativa
     if (hayMultiCompania) msg += '---\n\n';
 
-    // Bloque DA al final de cada compañía
     msg += buildBloqueDA(comp, cobsDeComp, E);
   }
 
@@ -358,18 +369,14 @@ async function generarMensaje(req, res, apiKey) {
 // ─────────────────────────────────────────────
 function formatPrecio(valor) {
   if (!valor) return null;
-  // Extraer solo dígitos y coma/punto
   const limpio = valor.toString().replace(/[^\d.,]/g, '');
-  // Convertir a número, eliminar decimales redondeando hacia arriba
   const num = Math.ceil(parseFloat(limpio.replace(/\./g, '').replace(',', '.')));
   if (isNaN(num)) return valor;
-  // Formatear con punto como separador de miles
   return '$' + num.toLocaleString('es-AR', { maximumFractionDigits: 0 });
 }
 
 function buildPrecioLinea(cob, E) {
   const comp = cob.compania;
-  const esTodoRiesgo  = cob.todo_riesgo === true;
   const esSoloTarjeta = cob.solo_tarjeta_credito === true;
 
   const cuatri  = formatPrecio(cob.precio_cuatrimestral);
@@ -384,10 +391,6 @@ function buildPrecioLinea(cob, E) {
       if (cuatri)  l += `${E.tarjeta} *4 cuotas de ${cuatri} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
       return l;
     }
-    if (esTodoRiesgo) {
-      return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
-    }
-    // Resto Norte: solo cuotas, sin contado
     return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
   }
 
@@ -398,10 +401,6 @@ function buildPrecioLinea(cob, E) {
       if (semest)  l += `${E.tarjeta} *6 cuotas de ${semest} — solo mediante Débito Automático con Tarjeta de Crédito*\n`;
       return l;
     }
-    if (esTodoRiesgo) {
-      return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
-    }
-    // Resto FedPat: solo cuotas, sin contado
     return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
   }
 
@@ -432,7 +431,6 @@ function buildBeneficiosFedpat(codigo, E) {
 }
 
 function buildBloqueDA(comp, cobs, E) {
-  // Si todas las coberturas son solo_tarjeta_credito, el bloque DA ya está inline en cada precio
   const todasSoloTarjeta = cobs.every(c => c.solo_tarjeta_credito === true);
   if (todasSoloTarjeta) return '';
 
