@@ -82,6 +82,12 @@ CRÍTICO — MÚLTIPLES PDFs:
 - No ignorés ningún PDF. Si hay 2 PDFs, el array debe tener coberturas de ambos.
 - Para "vehiculo" usá los datos del primer PDF (suelen ser el mismo vehículo).
 
+CRÍTICO — VALIDACIÓN DE VEHÍCULO:
+- Si hay más de un PDF, verificá que todos coticen el MISMO vehículo (misma marca, modelo y año).
+- Si los vehículos son distintos entre PDFs, NO extraigas coberturas. Devolvé SOLO este JSON:
+  {"error": "vehiculos_distintos", "detalle": "PDF 1: [vehiculo1] / PDF 2: [vehiculo2]"}
+- Pequeñas diferencias de formato en el nombre están bien (ej: "VW" vs "Volkswagen"). Solo es error si son autos claramente distintos.
+
 No agregues, no inferís, no completés con información que no esté explícitamente en los PDFs.
 
 IDENTIFICACION DE COMPANIA — mirá el encabezado o logo del PDF:
@@ -111,6 +117,7 @@ Devuelve SOLO un JSON válido sin markdown ni backticks:
       "solo_tarjeta_credito": false,
       "franquicia_tipo": null,
       "franquicia_valor": null,
+      "franquicia_monto": null,
       "ajuste_automatico": false,
       "grua_km": "300km",
       "precio_cuatrimestral": "$60.680",
@@ -152,14 +159,14 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 - Si no figura explícitamente → ajuste_automatico = false
 - IMPORTANTE: el ajuste automático NO es una franquicia. Son conceptos distintos. No pongas franquicia_valor cuando encuentres ajuste automático.
 
-── FRANQUICIA ──
+── FRANQUICIA / DEDUCIBLE ──
 - La franquicia es el monto que paga el asegurado de su bolsillo ante un siniestro parcial
 - Solo tienen franquicia real: Norte Plan D, FedPat Plan TD3, Sancor Todo Riesgo
-- FedPat: si "FRANQUICIA POR DAÑO" dice "No Aplica" o "$0" → franquicia_tipo = null, franquicia_valor = null
-- FedPat TD3: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje", franquicia_valor = "5%" (el % que figure)
-- El Norte D: buscar monto fijo de franquicia → franquicia_tipo = "fija", franquicia_valor = "$700.000" (el monto que figure)
-- Sancor Todo Riesgo: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje", franquicia_valor = "10%" (el % que figure)
-- Para TODOS los demás planes → franquicia_tipo = null, franquicia_valor = null
+- FedPat: si "FRANQUICIA POR DAÑO" dice "No Aplica" o "$0" → franquicia_tipo = null, franquicia_valor = null, franquicia_monto = null
+- FedPat TD3: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje", franquicia_valor = "5%" (el % que figure), franquicia_monto = null
+- El Norte D: buscar monto fijo de franquicia → franquicia_tipo = "fija", franquicia_valor = "$700.000" (el monto que figure), franquicia_monto = null
+- Sancor Todo Riesgo: buscar la línea "Deducible" o "Franquicia/Deduc." del plan (NO la del pie general) → franquicia_tipo = "porcentaje", franquicia_valor = "2%" (el % que figure), franquicia_monto = "$166.662" (el monto en $ que figure junto al porcentaje, si está)
+- Para TODOS los demás planes → franquicia_tipo = null, franquicia_valor = null, franquicia_monto = null
 - Las aclaraciones generales de Sancor sobre "Franquicia/Deduc. Robo Parcial" al pie NO son franquicia del plan
 
 ── PRECIOS EL NORTE ──
@@ -229,6 +236,15 @@ RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no ag
     const contexto = jsonMatch[0].slice(Math.max(0, pos - 100), pos + 100);
     console.error('JSON invalido de Gemini en posicion', pos, '— contexto:', contexto);
     throw new Error('Gemini devolvio un JSON invalido: ' + parseErr.message);
+  }
+
+  // Detectar error de vehículos distintos devuelto por Gemini
+  if (cotizacion.error === 'vehiculos_distintos') {
+    const detalle = cotizacion.detalle || '';
+    return res.status(422).end(Buffer.from(JSON.stringify({
+      error: 'Los PDFs corresponden a vehículos distintos. Verificá que todas las cotizaciones sean del mismo auto.',
+      detalle
+    }), 'utf8'));
   }
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -333,9 +349,14 @@ async function generarMensaje(req, res, apiKey) {
       let nombrePlan;
       if (esRecomendado) {
         if (cob.franquicia_valor) {
-          nombrePlan = cob.franquicia_tipo === 'fija'
-            ? `Todo Riesgo \u2014 Franquicia Fija ${cob.franquicia_valor}`
-            : `Todo Riesgo \u2014 Franquicia ${cob.franquicia_valor}`;
+          if (cob.franquicia_tipo === 'fija') {
+            nombrePlan = `Todo Riesgo \u2014 Franquicia Fija ${cob.franquicia_valor}`;
+          } else if (cob.compania === 'sancor') {
+            const montoLabel = cob.franquicia_monto ? ` (${cob.franquicia_monto})` : '';
+            nombrePlan = `Todo Riesgo \u2014 Deducible ${cob.franquicia_valor}${montoLabel}`;
+          } else {
+            nombrePlan = `Todo Riesgo \u2014 Franquicia ${cob.franquicia_valor}`;
+          }
         } else {
           nombrePlan = 'Todo Riesgo';
         }
@@ -346,9 +367,15 @@ async function generarMensaje(req, res, apiKey) {
       // FIX E: si es grupo de multiples todo riesgo del mismo codigo,
       // mostrar solo franquicia + precio (sin repetir coberturas)
       if (hayMultiTodoRiesgoMismoCodigo && esRecomendado) {
-        const franqLabel = cob.franquicia_tipo === 'fija'
-          ? `Franquicia Fija ${cob.franquicia_valor}`
-          : `Franquicia ${cob.franquicia_valor}`;
+        let franqLabel;
+        if (cob.franquicia_tipo === 'fija') {
+          franqLabel = `Franquicia Fija ${cob.franquicia_valor}`;
+        } else if (cob.compania === 'sancor') {
+          const montoLabel = cob.franquicia_monto ? ` (${cob.franquicia_monto})` : '';
+          franqLabel = `Deducible ${cob.franquicia_valor}${montoLabel}`;
+        } else {
+          franqLabel = `Franquicia ${cob.franquicia_valor}`;
+        }
         msg += `${E.franq} *Opci\u00f3n ${numOpcion} \u2014 ${franqLabel}*\n`;
         msg += buildPrecioLinea(cob, E);
         msg += '\n';
