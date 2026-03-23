@@ -549,6 +549,15 @@ async function generarComparativa(req, res, apiKey) {
 
   const NOMBRE_COMP = { norte: 'El Norte Seguros', fedpat: 'Federación Patronal', sancor: 'Sancor Seguros' };
 
+  // Calcular cuota mensual equivalente para comparación justa entre compañías
+  const cuotasMensuales = planes.map(p => {
+    if (p.precio_mensual) return parseFloat((p.precio_mensual || '').replace(/[^0-9]/g, ''));
+    if (p.precio_cuatrimestral) return parseFloat((p.precio_cuatrimestral || '').replace(/[^0-9]/g, ''));
+    if (p.precio_semestral) return parseFloat((p.precio_semestral || '').replace(/[^0-9]/g, ''));
+    return null;
+  });
+  const cuotaMin = Math.min(...cuotasMensuales.filter(Boolean));
+
   const descripciones = planes.map((p, i) => {
     const comp = NOMBRE_COMP[p.compania] || p.compania;
     const precio = p.precio_cuatrimestral
@@ -558,18 +567,21 @@ async function generarComparativa(req, res, apiKey) {
         : p.precio_mensual
           ? `${p.precio_mensual}/mes`
           : 'precio no disponible';
+    const cuotaNum = cuotasMensuales[i];
+    const esMasBarato = cuotaNum !== null && cuotaNum === cuotaMin && cuotasMensuales.filter(c => c === cuotaMin).length === 1;
     const franqLabel = p.franquicia_valor
       ? (p.compania === 'sancor'
           ? `Deducible: ${p.franquicia_valor}${p.franquicia_monto ? ' (' + p.franquicia_monto + ')' : ''}`
           : p.franquicia_tipo === 'fija'
-            ? `Franquicia fija: ${p.franquicia_valor}`
-            : `Franquicia: ${p.franquicia_valor}`)
+            ? `Franquicia FIJA: ${p.franquicia_valor} (monto exacto, sin sorpresas)`
+            : `Franquicia PORCENTUAL: ${p.franquicia_valor} de la suma asegurada (varía según el valor del auto)`)
       : 'Sin franquicia';
     const cubre = (p.cubre || []).join(', ');
     const noCubre = (p.no_cubre || []).length ? (p.no_cubre || []).join(', ') : 'nada relevante';
+    const descuento = p.compania === 'norte' ? ' + 5% descuento adicional con débito automático' : '';
 
-    return `PLAN ${i + 1}: ${comp} — ${p.nombre}
-  - Precio: ${precio}
+    return `PLAN ${i + 1}: ${comp} — ${p.nombre}${esMasBarato ? ' ← MÁS ECONÓMICO' : ''}
+  - Precio: ${precio}${descuento}
   - Todo Riesgo: ${p.todo_riesgo ? 'Sí' : 'No'}
   - ${franqLabel}
   - Cubre: ${cubre}
@@ -592,7 +604,7 @@ async function generarComparativa(req, res, apiKey) {
     tipologia = 'Hay un plan de solo Responsabilidad Civil. Recomendá siempre cualquier opción con más cobertura. El RC puro deja al cliente muy expuesto ante cualquier siniestro propio.';
   }
 
-  const prompt = `Sos Christian Sanchez, Productor Asesor de Seguros en Resistencia, Chaco. Escribís mensajes de WhatsApp a tus clientes con un tono humano, cálido y honesto — como un amigo que sabe de seguros, no como un vendedor.
+  const prompt = `Sos Christian Sanchez, Productor Asesor de Seguros. Vas a escribir un mensaje corto de WhatsApp que va DESPUÉS de que el cliente ya recibió la cotización con todos los planes. No repetís coberturas ni precios — el cliente ya los tiene.
 
 VEHÍCULO: ${vehiculo?.descripcion || 'el vehículo del cliente'}
 
@@ -602,18 +614,35 @@ ${descripciones}
 TIPO DE COMPARATIVA:
 ${tipologia}
 
-TAREA: Escribí un mensaje de WhatsApp (2do mensaje, va separado de la cotización) explicando la diferencia clave entre estos planes y dando una recomendación clara y directa.
+═══════════════════════════════
+LÓGICA PARA RECOMENDAR — aplicá esto antes de escribir
+═══════════════════════════════
+- Franquicia FIJA siempre es mejor que porcentual: el cliente sabe exactamente cuánto paga, sin sorpresas. Un % sobre un auto caro puede ser $1.500.000 o más.
+- Si un plan tiene cuota más baja Y franquicia fija → es claramente el mejor. No lo dudes.
+- Si las coberturas son equivalentes y uno es más barato → recomendá el más barato.
+- El Norte siempre tiene 5% extra de descuento con débito automático — mencionalo si es relevante.
+- Nunca recomendés el más caro solo porque "da más tranquilidad" si el más barato cubre igual o mejor.
 
-REGLAS:
-- Tono: humano, cálido, de asesor de confianza. Nada técnico ni de vendedor.
-- Máximo 100 palabras. Breve y al punto.
-- Si hay un plan Todo Riesgo: recomendalo siempre, sin dudar. Explicá en 1-2 oraciones qué riesgo asume el cliente con las otras opciones.
-- Si no hay Todo Riesgo: recomendá el de mayor cobertura con una razón concreta.
-- Podés usar 1 emoji, con criterio.
-- No repitas los precios exactos ni las coberturas completas.
-- No uses negritas con asteriscos.
-- Cerrá con: Tu Asesor de Seguros, Christian 🤝
-- No incluyas saludo inicial — va directo al análisis.`;
+═══════════════════════════════
+FORMATO OBLIGATORIO — copiá esta estructura exacta
+═══════════════════════════════
+
+👉 Diferencia clave: [1-2 oraciones sobre LA diferencia que más importa para decidir — franquicia, precio, cobertura extra, lo que aplique]
+
+Mi recomendación es [Compañía + Plan] porque:
+· [Razón concreta 1]
+· [Razón concreta 2]
+· [Razón concreta 3, opcional]
+
+Tu Asesor de Seguros, Christian 🤝
+
+═══════════════════════════════
+REGLAS
+═══════════════════════════════
+- Seguí el formato de arriba SIN agregar nada más. Sin saludo, sin introducción, sin cierre extra.
+- Usá negritas con *asteriscos* solo en el nombre del plan recomendado.
+- Máximo 80 palabras en total.
+- Tono directo, humano, como asesor de confianza.`;
 
   const geminiBody = {
     contents: [{ parts: [{ text: prompt }] }],
