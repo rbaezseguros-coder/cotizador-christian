@@ -199,6 +199,32 @@ input[type="file"] { display: none; }
 .btn-secondary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; background: transparent; border: 1.5px solid var(--border2); color: var(--ink-dim); border-radius: var(--radius); padding: 12px; font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .btn-secondary:hover { border-color: var(--ink); color: var(--ink); }
 
+/* ── COMPARATIVA ── */
+.comp-section { margin-top: 22px; border-top: 1.5px solid var(--border); padding-top: 20px; }
+.comp-heading { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-dim); margin-bottom: 4px; }
+.comp-sub { font-size: 12px; color: var(--ink-muted); margin-bottom: 14px; }
+.comp-planes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.comp-check-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.18s; background: var(--surface); user-select: none; }
+.comp-check-item:hover { border-color: var(--border2); background: var(--surface2); }
+.comp-check-item.checked { border-color: var(--norte); background: var(--norte-light); }
+.comp-check-item.disabled { opacity: 0.45; cursor: not-allowed; }
+.comp-cb { width: 18px; height: 18px; flex-shrink: 0; border: 2px solid var(--border2); border-radius: 4px; transition: all 0.18s; position: relative; background: var(--surface); }
+.comp-check-item.checked .comp-cb { background: var(--norte); border-color: var(--norte); }
+.comp-check-item.checked .comp-cb::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; }
+.comp-label { font-size: 13px; font-weight: 500; flex: 1; }
+.comp-badge-comp { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; padding: 2px 7px; border-radius: 3px; flex-shrink: 0; }
+.btn-comparativa { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: #1a5fa8; color: #fff; border: none; border-radius: var(--radius); padding: 13px; font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
+.btn-comparativa:hover:not(:disabled) { background: #154d8c; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,95,168,0.3); }
+.btn-comparativa:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.comp-result-wrap { display: none; animation: fadeUp 0.3s ease; }
+.comp-result-wrap.show { display: block; }
+.comp-result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.comp-result-box { background: #e8f0fa; border: 1.5px solid #b8d0f0; border-radius: var(--radius); padding: 18px; font-size: 14px; line-height: 1.85; white-space: pre-wrap; word-break: break-word; min-height: 80px; margin-bottom: 10px; color: var(--ink); }
+.status-comp { display: none; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; font-weight: 500; }
+.status-comp.show { display: flex; }
+.status-comp.info { background: #e8f0fa; border: 1px solid #b8d0f0; color: var(--norte); }
+.status-comp.error { background: #fae8e8; border: 1px solid #f0b8b8; color: var(--fedpat); }
+
 @media(max-width:480px){ .steps { display: none; } .panel { padding: 18px; } .precio-compania-row { flex-direction: column; align-items: flex-start; } }
 </style>
 </head>
@@ -296,7 +322,28 @@ input[type="file"] { display: none; }
 
     <div class="result-box" id="resultBox" contenteditable="false"></div>
     <button class="btn-whatsapp" id="btnWA" onclick="enviarAWhatsApp()">💬 Abrir en WhatsApp</button>
-    <button class="btn-secondary" onclick="irPaso(2)">← Cambiar selección</button>
+    <button class="btn-secondary" onclick="comparativaSeleccionados.clear();document.getElementById('compResultWrap').classList.remove('show');irPaso(2)">← Cambiar selección</button>
+
+    <!-- ── COMPARATIVA ── -->
+    <div class="comp-section">
+      <div class="comp-heading">📊 Generar comparativa</div>
+      <div class="comp-sub">Seleccioná hasta 3 planes para que la IA arme un análisis personalizado — va como segundo mensaje.</div>
+      <div class="comp-planes" id="compPlanes"></div>
+      <div class="status-comp" id="statusComp"></div>
+      <button class="btn-comparativa" id="btnComparativa" onclick="generarComparativa()" disabled>
+        📊 Generar análisis comparativo
+      </button>
+      <div class="comp-result-wrap" id="compResultWrap">
+        <div class="comp-result-header">
+          <div class="result-title">💬 2° Mensaje — Análisis del asesor</div>
+          <div class="result-actions">
+            <button class="btn-sm" onclick="copiarComp()">📋 Copiar</button>
+          </div>
+        </div>
+        <div class="comp-result-box" id="compResultBox"></div>
+      </div>
+    </div>
+
     <button class="btn-secondary" onclick="nuevaCotizacion()">🔄 Nueva cotización</button>
   </div>
 
@@ -306,6 +353,7 @@ input[type="file"] { display: none; }
 let archivos = [];
 let cotizacion = { vehiculo: null, coberturas: [] };
 let seleccionados = new Set();
+let comparativaSeleccionados = new Set(); // IDs de planes para comparativa (máx 3)
 
 // Opciones por compañía: null = sin selector (fijo)
 // norte/fedpat: 'cuotas' | 'contado'
@@ -628,7 +676,9 @@ async function generarMensaje() {
     const mensaje = data.mensaje || '';
 
     document.getElementById('resultBox').textContent = mensaje;
+    comparativaSeleccionados.clear();
     irPaso(3);
+    renderCompPlanes();
     hideStatus('status2');
 
   } catch (err) {
@@ -666,8 +716,101 @@ function editar() {
   else { hideStatus('status2'); }
 }
 
+// ── RENDER CHECKBOXES DE COMPARATIVA ──
+function renderCompPlanes() {
+  const wrap = document.getElementById('compPlanes');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const nombres = { norte: 'El Norte', fedpat: 'Fed. Patronal', sancor: 'Sancor' };
+  const planesActivos = cotizacion.coberturas.filter(c => seleccionados.has(c.id));
+  if (planesActivos.length < 2) {
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--ink-muted);padding:6px 0">Necesitás seleccionar al menos 2 coberturas en el paso anterior para comparar.</div>';
+    document.getElementById('btnComparativa').disabled = true;
+    return;
+  }
+  planesActivos.forEach(c => {
+    const checked = comparativaSeleccionados.has(c.id);
+    const maxAlcanzado = !checked && comparativaSeleccionados.size >= 3;
+    const div = document.createElement('div');
+    div.className = 'comp-check-item' + (checked ? ' checked' : '') + (maxAlcanzado ? ' disabled' : '');
+    div.onclick = () => { if (!maxAlcanzado || checked) toggleCompPlan(c.id); };
+    div.innerHTML = `
+      <div class="comp-cb"></div>
+      <div class="comp-label">${c.nombre}${c.franquicia_valor ? ' · ' + c.franquicia_valor : ''}</div>
+      <span class="comp-badge-comp badge-${c.compania}">${nombres[c.compania] || c.compania}</span>`;
+    wrap.appendChild(div);
+  });
+  actualizarBtnComparativa();
+}
+
+function toggleCompPlan(id) {
+  if (comparativaSeleccionados.has(id)) {
+    comparativaSeleccionados.delete(id);
+  } else {
+    if (comparativaSeleccionados.size >= 3) return;
+    comparativaSeleccionados.add(id);
+  }
+  renderCompPlanes();
+}
+
+function actualizarBtnComparativa() {
+  const btn = document.getElementById('btnComparativa');
+  if (btn) btn.disabled = comparativaSeleccionados.size < 2;
+}
+
+async function generarComparativa() {
+  const planesParaComp = cotizacion.coberturas.filter(c => comparativaSeleccionados.has(c.id));
+  if (planesParaComp.length < 2) return;
+
+  const btn = document.getElementById('btnComparativa');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Generando análisis...';
+  showStatusComp('info', '⏳ Gemini está redactando el análisis...');
+
+  try {
+    const res = await fetch('/api/procesar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion: 'comparativa',
+        planes: planesParaComp,
+        vehiculo: cotizacion.vehiculo
+      })
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error del servidor (' + res.status + ')'); }
+    const data = await res.json();
+    const texto = data.comparativa || '';
+    document.getElementById('compResultBox').textContent = texto;
+    document.getElementById('compResultWrap').classList.add('show');
+    hideStatusComp();
+  } catch (err) {
+    showStatusComp('error', '❌ ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📊 Generar análisis comparativo';
+    actualizarBtnComparativa();
+  }
+}
+
+function copiarComp() {
+  navigator.clipboard.writeText(document.getElementById('compResultBox').textContent).then(() => {
+    showStatusComp('info', '📋 Copiado al portapapeles');
+    setTimeout(() => hideStatusComp(), 2500);
+  });
+}
+
+function showStatusComp(tipo, txt) {
+  const el = document.getElementById('statusComp');
+  el.className = 'status-comp show ' + tipo;
+  el.innerHTML = txt;
+}
+function hideStatusComp() {
+  const el = document.getElementById('statusComp');
+  if (el) el.className = 'status-comp';
+}
+
 function nuevaCotizacion() {
-  archivos = []; cotizacion = { vehiculo: null, coberturas: [] }; seleccionados.clear();
+  archivos = []; cotizacion = { vehiculo: null, coberturas: [] }; seleccionados.clear(); comparativaSeleccionados.clear();
   tipoPrecioPorCompania = { norte: 'cuotas', fedpat: 'cuotas', sancor: 'mensual' };
   document.getElementById('dropzone').style.display = '';
   document.getElementById('addMoreBtn').style.display = 'none';
