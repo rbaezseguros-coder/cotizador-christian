@@ -2,7 +2,7 @@ const BASE = {
   norte: {
     nombre: 'El Norte Seguros', facturacion: 'cuatrimestral',
     planes: {
-      'D':  { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Cristales y Cerraduras','Responsabilidad Civil'], no_cubre: [], todo_riesgo: true },
+      'D':  { cubre: ['Daños Parciales por Accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Cristales y Cerraduras','Responsabilidad Civil'], no_cubre: [], todo_riesgo: true },
       'C':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Granizo','Responsabilidad Civil'], no_cubre: ['Daños por accidente'], todo_riesgo: false },
       'C1': { cubre: ['Robo/Hurto e Incendio Total y Parcial','Granizo','Responsabilidad Civil'], no_cubre: ['Daños por accidente','Destrucción Total'], todo_riesgo: false },
       'B':  { cubre: ['Robo/Hurto e Incendio Total','Destrucción Total por Accidente','Responsabilidad Civil'], no_cubre: ['Robo parcial','Granizo','Daños por accidente'], todo_riesgo: false },
@@ -318,7 +318,10 @@ async function generarMensaje(req, res, apiKey) {
     msg += `${E.saludo} *¡Hola ${nombre}!* Te paso la cotización para tu vehículo:\n\n`;
   }
 
-  msg += `${E.auto} *${vehiculo.descripcion.toUpperCase()}*\n`;
+  const descVehiculo = vehiculo.descripcion
+    .replace(/\bvolkswagen\s+vw\b/gi, 'Volkswagen')
+    .replace(/\bvw\s+volkswagen\b/gi, 'Volkswagen');
+  msg += `${E.auto} *${descVehiculo.toUpperCase()}*\n`;
 
   if (!hayMultiCompania) {
     const numCot = coberturas[0]?.numero_cotizacion || null;
