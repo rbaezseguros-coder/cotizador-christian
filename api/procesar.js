@@ -50,9 +50,8 @@ export default async function handler(req, res) {
   const { accion } = req.body;
 
   try {
-    if (accion === 'analizar')    return await analizarPDFs(req, res, apiKey);
-    if (accion === 'generar')     return await generarMensaje(req, res, apiKey);
-    if (accion === 'comparativa') return await generarComparativa(req, res, apiKey);
+    if (accion === 'analizar') return await analizarPDFs(req, res, apiKey);
+    if (accion === 'generar')  return await generarMensaje(req, res, apiKey);
     return res.status(400).end(JSON.stringify({ error: 'Accion no valida' }));
   } catch (err) {
     console.error('Error:', err);
@@ -68,11 +67,22 @@ async function analizarPDFs(req, res, apiKey) {
   if (!pdfs || !pdfs.length) return res.status(400).end(JSON.stringify({ error: 'No se recibieron PDFs' }));
 
   const parts = [];
-  for (const pdf of pdfs) {
+  for (const [i, pdf] of pdfs.entries()) {
+    parts.push({ text: `=== PDF ${i + 1} de ${pdfs.length}: ${pdf.nombre} ===` });
     parts.push({ inlineData: { data: pdf.base64, mimeType: 'application/pdf' } });
   }
 
-  parts.push({ text: `Sos un extractor de datos de cotizaciones de seguros argentinos. Tu única tarea es extraer los datos del PDF y devolverlos en el formato JSON indicado. No agregues, no inferís, no completés con información que no esté explícitamente en el PDF.
+  const cantPDFs = pdfs.length;
+  parts.push({ text: `Sos un extractor de datos de cotizaciones de seguros argentinos. Recibís ${cantPDFs} PDF${cantPDFs > 1 ? 's' : ''} y tu tarea es extraer los datos de TODOS Y CADA UNO de ellos y devolverlos en el formato JSON indicado.
+
+CRÍTICO — MÚLTIPLES PDFs:
+- Recibís ${cantPDFs} archivo${cantPDFs > 1 ? 's' : ''}. Debés procesar TODOS sin excepción.
+- Cada PDF puede ser de una compañía distinta (Norte, FedPat, Sancor).
+- Las coberturas de TODOS los PDFs van juntas en el array "coberturas".
+- No ignorés ningún PDF. Si hay 2 PDFs, el array debe tener coberturas de ambos.
+- Para "vehiculo" usá los datos del primer PDF (suelen ser el mismo vehículo).
+
+No agregues, no inferís, no completés con información que no esté explícitamente en los PDFs.
 
 IDENTIFICACION DE COMPANIA — mirá el encabezado o logo del PDF:
 - "EL NORTE" o "elnorte.com.ar" → compania: "norte"
@@ -472,110 +482,6 @@ function buildBloqueDA(comp, E) {
     return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día*\n\n`;
   }
   return '';
-}
-
-// ─────────────────────────────────────────────
-// GENERAR COMPARATIVA — Gemini con tono de asesor
-// ─────────────────────────────────────────────
-async function generarComparativa(req, res, apiKey) {
-  const { planes, vehiculo } = req.body;
-  if (!planes || planes.length < 2) {
-    return res.status(400).end(JSON.stringify({ error: 'Se necesitan al menos 2 planes para comparar' }));
-  }
-
-  const NOMBRE_COMP = { norte: 'El Norte Seguros', fedpat: 'Federación Patronal', sancor: 'Sancor Seguros' };
-
-  // Armar descripción de cada plan para el prompt
-  const descripciones = planes.map((p, i) => {
-    const comp = NOMBRE_COMP[p.compania] || p.compania;
-    const precio = p.precio_cuatrimestral
-      ? `${p.precio_cuatrimestral} por cuota (4 cuotas)`
-      : p.precio_semestral
-        ? `${p.precio_semestral} por cuota (6 cuotas)`
-        : p.precio_mensual
-          ? `${p.precio_mensual}/mes`
-          : 'precio no disponible';
-    const franq = p.franquicia_valor
-      ? (p.franquicia_tipo === 'fija'
-          ? `Franquicia fija: ${p.franquicia_valor}`
-          : `Franquicia: ${p.franquicia_valor} de la suma asegurada`)
-      : 'Sin franquicia';
-    const cubre = (p.cubre || []).join(', ');
-    const noCubre = (p.no_cubre || []).length ? (p.no_cubre || []).join(', ') : 'nada relevante';
-    const todoRiesgo = p.todo_riesgo ? 'Sí (Todo Riesgo)' : 'No';
-
-    return `PLAN ${i + 1}: ${comp} — ${p.nombre}
-  - Precio: ${precio}
-  - Todo Riesgo: ${todoRiesgo}
-  - ${franq}
-  - Cubre: ${cubre}
-  - No cubre: ${noCubre}
-  - Grúa: ${p.grua_km || 'no incluida'}`;
-  }).join('\n\n');
-
-  // Detectar tipo de comparativa para orientar el análisis
-  const hayTodoRiesgo    = planes.some(p => p.todo_riesgo);
-  const todosToRiesgo    = planes.every(p => p.todo_riesgo);
-  const haySoloRC        = planes.some(p => p.solo_tarjeta_credito);
-  const companias        = [...new Set(planes.map(p => p.compania))];
-  const hayMultiCompania = companias.length > 1;
-
-  let tipologia = '';
-  if (todosToRiesgo) {
-    tipologia = 'Todos los planes son Todo Riesgo con distintas franquicias. El eje es: ¿cuánto podría pagar de franquicia vs cuánto ahorra por mes? Ayudá al cliente a pensar cuál le conviene según cómo usa el auto y cuánto tiene de reserva.';
-  } else if (hayTodoRiesgo && !haySoloRC) {
-    tipologia = 'Hay una mezcla de cobertura completa (Todo Riesgo) y cobertura parcial. El eje es: qué riesgo asume el cliente con los planes más baratos vs la tranquilidad del Todo Riesgo.';
-  } else if (!hayTodoRiesgo && !haySoloRC) {
-    tipologia = 'Son planes de cobertura parcial. El eje es: qué coberturas extras justifican la diferencia de precio entre opciones y cuál es el punto de equilibrio.';
-  } else if (haySoloRC) {
-    tipologia = 'Hay un plan de solo Responsabilidad Civil. El eje es: qué riesgo real asume el cliente con RC puro vs la diferencia de precio con una cobertura más completa.';
-  }
-
-  const prompt = `Sos Christian Sanchez, Productor Asesor de Seguros en Resistencia, Chaco. Escribís mensajes de WhatsApp a tus clientes con un tono humano, cálido y honesto — como un amigo que sabe de seguros, no como un vendedor.
-
-VEHÍCULO: ${vehiculo?.descripcion || 'el vehículo del cliente'}
-
-PLANES A COMPARAR:
-${descripciones}
-
-TIPO DE COMPARATIVA:
-${tipologia}
-
-${hayMultiCompania ? 'Son de distintas compañías — podés mencionar eso si agrega valor a la comparación.' : ''}
-
-TAREA: Escribí un mensaje de WhatsApp (2do mensaje, va separado de la cotización) explicando la diferencia entre estos planes y dando una recomendación personalizada. 
-
-REGLAS:
-- Tono: humano, cálido, de asesor de confianza. Nada técnico ni de vendedor.
-- Máximo 180 palabras.
-- Podés usar 1 o 2 emojis, con criterio — no en cada línea.
-- No repitas los precios exactos ni las coberturas completas (ya las tiene en el mensaje anterior).
-- Sí podés mencionar rangos o diferencias de precio si aportan al razonamiento.
-- No uses negritas con asteriscos.
-- Cerrá con: Tu Asesor de Seguros, Christian 🤝
-- No incluyas "Hola [nombre]" ni saludo inicial — va directo al análisis.`;
-
-  const geminiBody = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 1024, temperature: 0.8, thinkingConfig: { thinkingBudget: 0 } }
-  };
-
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
-  );
-
-  if (!geminiRes.ok) {
-    const err = await geminiRes.json().catch(() => ({}));
-    throw new Error(err.error?.message || 'Error de Gemini (' + geminiRes.status + ')');
-  }
-
-  const geminiData = await geminiRes.json();
-  const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  if (!texto) throw new Error('Gemini no devolvió texto.');
-
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.status(200).end(Buffer.from(JSON.stringify({ comparativa: texto.trim() }), 'utf8'));
 }
 
 // ─────────────────────────────────────────────
