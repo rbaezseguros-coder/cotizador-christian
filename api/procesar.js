@@ -52,6 +52,7 @@ export default async function handler(req, res) {
   try {
     if (accion === 'analizar') return await analizarPDFs(req, res, apiKey);
     if (accion === 'generar')  return await generarMensaje(req, res, apiKey);
+    if (accion === 'comparativa') return await generarComparativa(req, res, apiKey);
     return res.status(400).end(JSON.stringify({ error: 'Accion no valida' }));
   } catch (err) {
     console.error('Error:', err);
@@ -66,27 +67,97 @@ async function analizarPDFs(req, res, apiKey) {
   const { pdfs } = req.body;
   if (!pdfs || !pdfs.length) return res.status(400).end(JSON.stringify({ error: 'No se recibieron PDFs' }));
 
-  const parts = [];
-  for (const [i, pdf] of pdfs.entries()) {
-    parts.push({ text: `=== PDF ${i + 1} de ${pdfs.length}: ${pdf.nombre} ===` });
+  // ── Si hay un solo PDF: flujo original ──
+  // ── Si hay múltiples: procesar cada uno por separado y validar vehículos en backend ──
+
+  async function extraerUnPDF(pdf, indice, total) {
+    const parts = [];
+    parts.push({ text: `=== PDF ${indice + 1} de ${total}: ${pdf.nombre} ===` });
     parts.push({ inlineData: { data: pdf.base64, mimeType: 'application/pdf' } });
+    parts.push({ text: buildPromptExtraccion(1) });
+
+    const geminiBody = {
+      contents: [{ parts }],
+      generationConfig: { maxOutputTokens: 8192, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } }
+    };
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
+    );
+    if (!geminiRes.ok) {
+      const err = await geminiRes.json().catch(() => ({}));
+      throw new Error(err.error?.message || 'Error de Gemini (' + geminiRes.status + ')');
+    }
+    const geminiData = await geminiRes.json();
+    const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!texto) throw new Error('Gemini no devolvio texto para PDF ' + (indice + 1));
+    const jsonMatch = texto.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No se encontro JSON en la respuesta del PDF ' + (indice + 1));
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (parseErr) {
+      const pos = parseInt(parseErr.message.match(/position (\d+)/)?.[1] || '0');
+      const contexto = jsonMatch[0].slice(Math.max(0, pos - 100), pos + 100);
+      console.error('JSON invalido PDF', indice + 1, 'en posicion', pos, '— contexto:', contexto);
+      throw new Error('JSON invalido en PDF ' + (indice + 1) + ': ' + parseErr.message);
+    }
   }
 
-  const cantPDFs = pdfs.length;
-  parts.push({ text: `Sos un extractor de datos de cotizaciones de seguros argentinos. Recibís ${cantPDFs} PDF${cantPDFs > 1 ? 's' : ''} y tu tarea es extraer los datos de TODOS Y CADA UNO de ellos y devolverlos en el formato JSON indicado.
+  // Extraer todos los PDFs (en paralelo para mayor velocidad)
+  const resultados = await Promise.all(pdfs.map((pdf, i) => extraerUnPDF(pdf, i, pdfs.length)));
 
-CRÍTICO — MÚLTIPLES PDFs:
-- Recibís ${cantPDFs} archivo${cantPDFs > 1 ? 's' : ''}. Debés procesar TODOS sin excepción.
-- Cada PDF puede ser de una compañía distinta (Norte, FedPat, Sancor).
-- Las coberturas de TODOS los PDFs van juntas en el array "coberturas".
-- No ignorés ningún PDF. Si hay 2 PDFs, el array debe tener coberturas de ambos.
-- Para "vehiculo" usá los datos del primer PDF (suelen ser el mismo vehículo).
+  // ── VALIDACIÓN DE VEHÍCULOS EN BACKEND ──
+  if (pdfs.length > 1) {
+    const vehiculos = resultados.map(r => normalizarVehiculo(r.vehiculo?.descripcion || ''));
+    const vehiculoBase = vehiculos[0];
+    for (let i = 1; i < vehiculos.length; i++) {
+      if (!vehiculosSonIguales(vehiculoBase, vehiculos[i])) {
+        return res.status(422).end(Buffer.from(JSON.stringify({
+          error: `Los PDFs corresponden a vehículos distintos. Verificá que todas las cotizaciones sean del mismo auto.`,
+          detalle: resultados.map((r, j) => `PDF ${j + 1}: ${r.vehiculo?.descripcion || 'desconocido'}`).join(' / ')
+        }), 'utf8'));
+      }
+    }
+  }
 
-CRÍTICO — VALIDACIÓN DE VEHÍCULO:
-- Si hay más de un PDF, verificá que todos coticen el MISMO vehículo (misma marca, modelo y año).
-- Si los vehículos son distintos entre PDFs, NO extraigas coberturas. Devolvé SOLO este JSON:
-  {"error": "vehiculos_distintos", "detalle": "PDF 1: [vehiculo1] / PDF 2: [vehiculo2]"}
-- Pequeñas diferencias de formato en el nombre están bien (ej: "VW" vs "Volkswagen"). Solo es error si son autos claramente distintos.
+  // ── MERGE: tomar vehículo del primero, coberturas de todos ──
+  const cotizacion = {
+    vehiculo: resultados[0].vehiculo,
+    coberturas: resultados.flatMap(r => r.coberturas || [])
+  };
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.status(200).end(Buffer.from(JSON.stringify(cotizacion), 'utf8'));
+}
+
+// ── Normalizar descripción de vehículo para comparación ──
+function normalizarVehiculo(desc) {
+  return desc
+    .toLowerCase()
+    .replace(/volkswagen/g, 'vw')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ── Comparar dos vehículos: deben compartir al menos marca + modelo + año ──
+function vehiculosSonIguales(a, b) {
+  if (!a || !b) return false;
+  // Extraer tokens significativos (ignorar palabras muy cortas)
+  const tokensA = new Set(a.split(' ').filter(t => t.length > 2));
+  const tokensB = new Set(b.split(' ').filter(t => t.length > 2));
+  // Contar cuántos tokens coinciden
+  let coincidencias = 0;
+  for (const t of tokensA) { if (tokensB.has(t)) coincidencias++; }
+  // Deben coincidir al menos 3 tokens (marca, modelo, año aprox)
+  return coincidencias >= 3;
+}
+
+// ─────────────────────────────────────────────
+// HELPER — armar prompt de extracción (para 1 PDF)
+// ─────────────────────────────────────────────
+function buildPromptExtraccion(cantPDFs) {
+  return `Sos un extractor de datos de cotizaciones de seguros argentinos. Recibís ${cantPDFs} PDF${cantPDFs > 1 ? 's' : ''} y tu tarea es extraer los datos de TODOS Y CADA UNO de ellos y devolverlos en el formato JSON indicado.
 
 No agregues, no inferís, no completés con información que no esté explícitamente en los PDFs.
 
@@ -201,54 +272,9 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 - El Norte: número junto a "Cotización" (ej: "3.301.449")
 - FedPat: número junto a "Cotización" (ej: "286667905")
 - Sancor: número junto a "Cotización" (ej: "0190753302")
-- Si hay dos PDFs de distintas compañías, cada cobertura lleva el número de su propio PDF
 
 Si el PDF tiene varias coberturas, crear una entrada por cada una con id único.
-RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no agregués nada extra.` });
-
-  const geminiBody = {
-    contents: [{ parts }],
-    generationConfig: { maxOutputTokens: 8192, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } }
-  };
-
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
-  );
-
-  if (!geminiRes.ok) {
-    const err = await geminiRes.json().catch(() => ({}));
-    throw new Error(err.error?.message || 'Error de Gemini (' + geminiRes.status + ')');
-  }
-
-  const geminiData = await geminiRes.json();
-  const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  if (!texto) throw new Error('Gemini no devolvio texto.');
-
-  const jsonMatch = texto.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No se encontro JSON en la respuesta.');
-
-  let cotizacion;
-  try {
-    cotizacion = JSON.parse(jsonMatch[0]);
-  } catch (parseErr) {
-    const pos = parseInt(parseErr.message.match(/position (\d+)/)?.[1] || '0');
-    const contexto = jsonMatch[0].slice(Math.max(0, pos - 100), pos + 100);
-    console.error('JSON invalido de Gemini en posicion', pos, '— contexto:', contexto);
-    throw new Error('Gemini devolvio un JSON invalido: ' + parseErr.message);
-  }
-
-  // Detectar error de vehículos distintos devuelto por Gemini
-  if (cotizacion.error === 'vehiculos_distintos') {
-    const detalle = cotizacion.detalle || '';
-    return res.status(422).end(Buffer.from(JSON.stringify({
-      error: 'Los PDFs corresponden a vehículos distintos. Verificá que todas las cotizaciones sean del mismo auto.',
-      detalle
-    }), 'utf8'));
-  }
-
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.status(200).end(Buffer.from(JSON.stringify(cotizacion), 'utf8'));
+RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no agregués nada extra.`;
 }
 
 // ─────────────────────────────────────────────
@@ -509,6 +535,107 @@ function buildBloqueDA(comp, E) {
     return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día*\n\n`;
   }
   return '';
+}
+
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// GENERAR COMPARATIVA — Gemini con tono de asesor
+// ─────────────────────────────────────────────
+async function generarComparativa(req, res, apiKey) {
+  const { planes, vehiculo } = req.body;
+  if (!planes || planes.length < 2) {
+    return res.status(400).end(JSON.stringify({ error: 'Se necesitan al menos 2 planes para comparar' }));
+  }
+
+  const NOMBRE_COMP = { norte: 'El Norte Seguros', fedpat: 'Federación Patronal', sancor: 'Sancor Seguros' };
+
+  const descripciones = planes.map((p, i) => {
+    const comp = NOMBRE_COMP[p.compania] || p.compania;
+    const precio = p.precio_cuatrimestral
+      ? `${p.precio_cuatrimestral} por cuota (4 cuotas)`
+      : p.precio_semestral
+        ? `${p.precio_semestral} por cuota (6 cuotas)`
+        : p.precio_mensual
+          ? `${p.precio_mensual}/mes`
+          : 'precio no disponible';
+    const franqLabel = p.franquicia_valor
+      ? (p.compania === 'sancor'
+          ? `Deducible: ${p.franquicia_valor}${p.franquicia_monto ? ' (' + p.franquicia_monto + ')' : ''}`
+          : p.franquicia_tipo === 'fija'
+            ? `Franquicia fija: ${p.franquicia_valor}`
+            : `Franquicia: ${p.franquicia_valor}`)
+      : 'Sin franquicia';
+    const cubre = (p.cubre || []).join(', ');
+    const noCubre = (p.no_cubre || []).length ? (p.no_cubre || []).join(', ') : 'nada relevante';
+
+    return `PLAN ${i + 1}: ${comp} — ${p.nombre}
+  - Precio: ${precio}
+  - Todo Riesgo: ${p.todo_riesgo ? 'Sí' : 'No'}
+  - ${franqLabel}
+  - Cubre: ${cubre}
+  - No cubre: ${noCubre}
+  - Grúa: ${p.grua_km || 'no incluida'}`;
+  }).join('\n\n');
+
+  const hayTodoRiesgo   = planes.some(p => p.todo_riesgo);
+  const todosToRiesgo   = planes.every(p => p.todo_riesgo);
+  const haySoloRC       = planes.some(p => p.solo_tarjeta_credito);
+
+  let tipologia = '';
+  if (todosToRiesgo) {
+    tipologia = 'Todos los planes son Todo Riesgo con distintas franquicias. El eje es: ¿cuánto podría pagar de franquicia vs cuánto ahorra por mes? Ayudá al cliente a elegir según cómo usa el auto y cuánto tiene de reserva. No hay un "mejor" claro — es una decisión de bolsillo.';
+  } else if (hayTodoRiesgo) {
+    tipologia = 'Hay un plan Todo Riesgo entre las opciones. SIEMPRE recomendá el Todo Riesgo. Explicá brevemente qué riesgo asume el cliente con las otras opciones y por qué el Todo Riesgo es la mejor decisión. Sé directo y claro en la recomendación.';
+  } else if (!hayTodoRiesgo && !haySoloRC) {
+    tipologia = 'Son planes de cobertura parcial. Recomendá el de mayor cobertura. Explicá qué coberturas extras justifican la diferencia de precio.';
+  } else if (haySoloRC) {
+    tipologia = 'Hay un plan de solo Responsabilidad Civil. Recomendá siempre cualquier opción con más cobertura. El RC puro deja al cliente muy expuesto ante cualquier siniestro propio.';
+  }
+
+  const prompt = `Sos Christian Sanchez, Productor Asesor de Seguros en Resistencia, Chaco. Escribís mensajes de WhatsApp a tus clientes con un tono humano, cálido y honesto — como un amigo que sabe de seguros, no como un vendedor.
+
+VEHÍCULO: ${vehiculo?.descripcion || 'el vehículo del cliente'}
+
+PLANES A COMPARAR:
+${descripciones}
+
+TIPO DE COMPARATIVA:
+${tipologia}
+
+TAREA: Escribí un mensaje de WhatsApp (2do mensaje, va separado de la cotización) explicando la diferencia clave entre estos planes y dando una recomendación clara y directa.
+
+REGLAS:
+- Tono: humano, cálido, de asesor de confianza. Nada técnico ni de vendedor.
+- Máximo 100 palabras. Breve y al punto.
+- Si hay un plan Todo Riesgo: recomendalo siempre, sin dudar. Explicá en 1-2 oraciones qué riesgo asume el cliente con las otras opciones.
+- Si no hay Todo Riesgo: recomendá el de mayor cobertura con una razón concreta.
+- Podés usar 1 emoji, con criterio.
+- No repitas los precios exactos ni las coberturas completas.
+- No uses negritas con asteriscos.
+- Cerrá con: Tu Asesor de Seguros, Christian 🤝
+- No incluyas saludo inicial — va directo al análisis.`;
+
+  const geminiBody = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { maxOutputTokens: 1024, temperature: 0.8, thinkingConfig: { thinkingBudget: 0 } }
+  };
+
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
+  );
+
+  if (!geminiRes.ok) {
+    const err = await geminiRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Error de Gemini (' + geminiRes.status + ')');
+  }
+
+  const geminiData = await geminiRes.json();
+  const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  if (!texto) throw new Error('Gemini no devolvió texto.');
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.status(200).end(Buffer.from(JSON.stringify({ comparativa: texto.trim() }), 'utf8'));
 }
 
 // ─────────────────────────────────────────────
