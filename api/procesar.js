@@ -14,7 +14,7 @@ const BASE = {
   fedpat: {
     nombre: 'Federación Patronal', facturacion: 'semestral',
     planes: {
-      'TD3': { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Cristales y Cerraduras','Asistencia en viaje'], no_cubre: ['Granizo'], todo_riesgo: true },
+      'TD3': { cubre: ['Daños Parciales por Accidente','Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Responsabilidad Civil','Cristales, lunetas, parabrisas y Cerraduras'], no_cubre: ['Granizo'], todo_riesgo: true },
       'CF':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Responsabilidad Civil','Cristales y Cerraduras'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
       'C':   { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
       'C1':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Responsabilidad Civil'], no_cubre: ['Daños por accidente','Destrucción Total','Granizo'], todo_riesgo: false },
@@ -52,7 +52,6 @@ export default async function handler(req, res) {
   try {
     if (accion === 'analizar') return await analizarPDFs(req, res, apiKey);
     if (accion === 'generar')  return await generarMensaje(req, res, apiKey);
-    if (accion === 'comparativa') return await generarComparativa(req, res, apiKey);
     return res.status(400).end(JSON.stringify({ error: 'Accion no valida' }));
   } catch (err) {
     console.error('Error:', err);
@@ -234,7 +233,7 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 - La franquicia es el monto que paga el asegurado de su bolsillo ante un siniestro parcial
 - Solo tienen franquicia real: Norte Plan D, FedPat Plan TD3, Sancor Todo Riesgo
 - FedPat: si "FRANQUICIA POR DAÑO" dice "No Aplica" o "$0" → franquicia_tipo = null, franquicia_valor = null, franquicia_monto = null
-- FedPat TD3: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje", franquicia_valor = "5%" (el % que figure), franquicia_monto = null
+- FedPat TD3: buscar el porcentaje real de franquicia → franquicia_tipo = "porcentaje", franquicia_valor = "5%" (el % que figure), franquicia_monto = "$500.000" (el monto en $ que figure junto a la descripción de franquicia, si está)
 - El Norte D: buscar monto fijo de franquicia → franquicia_tipo = "fija", franquicia_valor = "$700.000" (el monto que figure), franquicia_monto = null
 - Sancor Todo Riesgo: buscar la línea "Deducible" o "Franquicia/Deduc." del plan (NO la del pie general) → franquicia_tipo = "porcentaje", franquicia_valor = "2%" (el % que figure), franquicia_monto = "$166.662" (el monto en $ que figure junto al porcentaje, si está)
 - Para TODOS los demás planes → franquicia_tipo = null, franquicia_valor = null, franquicia_monto = null
@@ -349,11 +348,36 @@ async function generarMensaje(req, res, apiKey) {
     const hayMultiTodoRiesgoMismoCodigo = codsToRiesgo.length > 1 &&
       codsToRiesgo.every(cod => cod === codsToRiesgo[0]);
 
+    const EMOJI_COBER = {
+      'Daños Parciales por Accidente':              '🚗',
+      'Daños por accidente':                        '🚗',
+      'Daños totales por accidente':                '🚗',
+      'Robo/Hurto e Incendio Total y Parcial':      '🔒🔥',
+      'Robo/Hurto e Incendio Total':                '🔒🔥',
+      'Robo/Hurto e Incendio':                      '🔒🔥',
+      'Destrucción Total por Accidente':            '💥',
+      'Destrucción Total':                          '💥',
+      'Responsabilidad Civil':                      '🛡️',
+      'Responsabilidad Civil límite máximo':        '🛡️',
+      'Cristales y Cerraduras':                     '🪟',
+      'Cristales, lunetas, parabrisas y Cerraduras':'🪟',
+      'Cristales':                                  '🪟',
+      'Cerraduras':                                 '🔑',
+      'Granizo':                                    '🌨️',
+      'Inundación':                                 '🌊',
+      'Asistencia al vehículo':                     '🔧',
+      'Asistencia completa':                        '🔧',
+      'Asistencia en viaje':                        '🚑',
+    };
+
     // Si hay multiples todo riesgo del mismo codigo, mostrar coberturas una sola vez arriba
     if (hayMultiTodoRiesgoMismoCodigo) {
       const primera = cobsDeComp.find(c => c.todo_riesgo === true);
       msg += `${E.estrella} *Todo Riesgo*\n`;
-      const itemsCubreTR = [...(primera.cubre || [])];
+      const itemsCubreTR = (primera.cubre || []).map(item => {
+        const emoji = EMOJI_COBER[item];
+        return emoji ? `${emoji} ${item}` : item;
+      });
       if (primera.grua_km) {
         const kmLabel = primera.grua_km === 'incluida' ? '' : ` ${primera.grua_km}`;
         itemsCubreTR.push(`\uD83D\uDD27 Asistencia con gr\u00faa${kmLabel}`);
@@ -381,7 +405,8 @@ async function generarMensaje(req, res, apiKey) {
             const montoLabel = cob.franquicia_monto ? ` (${cob.franquicia_monto})` : '';
             nombrePlan = `Todo Riesgo \u2014 Deducible ${cob.franquicia_valor}${montoLabel}`;
           } else {
-            nombrePlan = `Todo Riesgo \u2014 Franquicia ${cob.franquicia_valor}`;
+            const montoLabel = cob.franquicia_monto ? ` (${cob.franquicia_monto})` : '';
+            nombrePlan = `Todo Riesgo \u2014 Franquicia ${cob.franquicia_valor}${montoLabel}`;
           }
         } else {
           nombrePlan = 'Todo Riesgo';
@@ -400,7 +425,8 @@ async function generarMensaje(req, res, apiKey) {
           const montoLabel = cob.franquicia_monto ? ` (${cob.franquicia_monto})` : '';
           franqLabel = `Deducible ${cob.franquicia_valor}${montoLabel}`;
         } else {
-          franqLabel = `Franquicia ${cob.franquicia_valor}`;
+          const montoLabel = cob.franquicia_monto ? ` (${cob.franquicia_monto})` : '';
+          franqLabel = `Franquicia ${cob.franquicia_valor}${montoLabel}`;
         }
         msg += `${E.franq} *Opci\u00f3n ${numOpcion} \u2014 ${franqLabel}*\n`;
         msg += buildPrecioLinea(cob, E);
@@ -416,7 +442,10 @@ async function generarMensaje(req, res, apiKey) {
       }
 
       // Coberturas en una linea + Grua
-      const itemsCubre = [...(cob.cubre || [])];
+      const itemsCubre = (cob.cubre || []).map(item => {
+        const emoji = EMOJI_COBER[item];
+        return emoji ? `${emoji} ${item}` : item;
+      });
       if (cob.grua_km) {
         const kmLabel = cob.grua_km === 'incluida' ? '' : ` ${cob.grua_km}`;
         itemsCubre.push(`\uD83D\uDD27 Asistencia con gr\u00faa${kmLabel}`);
@@ -538,147 +567,14 @@ function buildBloqueDA(comp, E) {
 }
 
 // ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// GENERAR COMPARATIVA — Gemini con tono de asesor
-// ─────────────────────────────────────────────
-async function generarComparativa(req, res, apiKey) {
-  const { planes, vehiculo } = req.body;
-  if (!planes || planes.length < 2) {
-    return res.status(400).end(JSON.stringify({ error: 'Se necesitan al menos 2 planes para comparar' }));
-  }
-
-  const NOMBRE_COMP = { norte: 'El Norte Seguros', fedpat: 'Federación Patronal', sancor: 'Sancor Seguros' };
-
-  // Calcular cuota mensual equivalente para comparación justa entre compañías
-  const cuotasMensuales = planes.map(p => {
-    if (p.precio_mensual) return parseFloat((p.precio_mensual || '').replace(/[^0-9]/g, ''));
-    if (p.precio_cuatrimestral) return parseFloat((p.precio_cuatrimestral || '').replace(/[^0-9]/g, ''));
-    if (p.precio_semestral) return parseFloat((p.precio_semestral || '').replace(/[^0-9]/g, ''));
-    return null;
-  });
-  const cuotaMin = Math.min(...cuotasMensuales.filter(Boolean));
-
-  const descripciones = planes.map((p, i) => {
-    const comp = NOMBRE_COMP[p.compania] || p.compania;
-    const precio = p.precio_cuatrimestral
-      ? `${p.precio_cuatrimestral} por cuota (4 cuotas)`
-      : p.precio_semestral
-        ? `${p.precio_semestral} por cuota (6 cuotas)`
-        : p.precio_mensual
-          ? `${p.precio_mensual}/mes`
-          : 'precio no disponible';
-    const cuotaNum = cuotasMensuales[i];
-    const esMasBarato = cuotaNum !== null && cuotaNum === cuotaMin && cuotasMensuales.filter(c => c === cuotaMin).length === 1;
-    const franqLabel = p.franquicia_valor
-      ? (p.compania === 'sancor'
-          ? `Deducible: ${p.franquicia_valor}${p.franquicia_monto ? ' (' + p.franquicia_monto + ')' : ''}`
-          : p.franquicia_tipo === 'fija'
-            ? `Franquicia FIJA: ${p.franquicia_valor} (monto exacto, sin sorpresas)`
-            : `Franquicia PORCENTUAL: ${p.franquicia_valor} de la suma asegurada (varía según el valor del auto)`)
-      : 'Sin franquicia';
-    const cubre = (p.cubre || []).join(', ');
-    const noCubre = (p.no_cubre || []).length ? (p.no_cubre || []).join(', ') : 'nada relevante';
-    const descuento = p.compania === 'norte' ? ' + 5% descuento adicional con débito automático' : '';
-
-    return `PLAN ${i + 1}: ${comp} — ${p.nombre}${esMasBarato ? ' ← MÁS ECONÓMICO' : ''}
-  - Precio: ${precio}${descuento}
-  - Todo Riesgo: ${p.todo_riesgo ? 'Sí' : 'No'}
-  - ${franqLabel}
-  - Cubre: ${cubre}
-  - No cubre: ${noCubre}
-  - Grúa: ${p.grua_km || 'no incluida'}`;
-  }).join('\n\n');
-
-  const hayTodoRiesgo   = planes.some(p => p.todo_riesgo);
-  const todosToRiesgo   = planes.every(p => p.todo_riesgo);
-  const haySoloRC       = planes.some(p => p.solo_tarjeta_credito);
-
-  let tipologia = '';
-  if (todosToRiesgo) {
-    tipologia = 'Todos los planes son Todo Riesgo con distintas franquicias. El eje es: ¿cuánto podría pagar de franquicia vs cuánto ahorra por mes? Ayudá al cliente a elegir según cómo usa el auto y cuánto tiene de reserva. No hay un "mejor" claro — es una decisión de bolsillo.';
-  } else if (hayTodoRiesgo) {
-    tipologia = 'Hay un plan Todo Riesgo entre las opciones. SIEMPRE recomendá el Todo Riesgo. Explicá brevemente qué riesgo asume el cliente con las otras opciones y por qué el Todo Riesgo es la mejor decisión. Sé directo y claro en la recomendación.';
-  } else if (!hayTodoRiesgo && !haySoloRC) {
-    tipologia = 'Son planes de cobertura parcial. Recomendá el de mayor cobertura. Explicá qué coberturas extras justifican la diferencia de precio.';
-  } else if (haySoloRC) {
-    tipologia = 'Hay un plan de solo Responsabilidad Civil. Recomendá siempre cualquier opción con más cobertura. El RC puro deja al cliente muy expuesto ante cualquier siniestro propio.';
-  }
-
-  const prompt = `Sos Christian Sanchez, Productor Asesor de Seguros. Vas a escribir un mensaje corto de WhatsApp que va DESPUÉS de que el cliente ya recibió la cotización con todos los planes. No repetís coberturas ni precios — el cliente ya los tiene.
-
-VEHÍCULO: ${vehiculo?.descripcion || 'el vehículo del cliente'}
-
-PLANES A COMPARAR:
-${descripciones}
-
-TIPO DE COMPARATIVA:
-${tipologia}
-
-═══════════════════════════════
-LÓGICA PARA RECOMENDAR — aplicá esto antes de escribir
-═══════════════════════════════
-- Franquicia FIJA siempre es mejor que porcentual: el cliente sabe exactamente cuánto paga, sin sorpresas. Un % sobre un auto caro puede ser $1.500.000 o más.
-- Si un plan tiene cuota más baja Y franquicia fija → es claramente el mejor. No lo dudes.
-- Si las coberturas son equivalentes y uno es más barato → recomendá el más barato.
-- El Norte siempre tiene 5% extra de descuento con débito automático — mencionalo si es relevante.
-- Nunca recomendés el más caro solo porque "da más tranquilidad" si el más barato cubre igual o mejor.
-
-═══════════════════════════════
-FORMATO OBLIGATORIO — copiá esta estructura exacta
-═══════════════════════════════
-
-👉 Diferencia clave: [1-2 oraciones sobre LA diferencia que más importa para decidir — franquicia, precio, cobertura extra, lo que aplique]
-
-Mi recomendación es [Compañía + Plan] porque:
-· [Razón concreta 1]
-· [Razón concreta 2]
-· [Razón concreta 3, opcional]
-
-Tu Asesor de Seguros, Christian 🤝
-
-═══════════════════════════════
-REGLAS
-═══════════════════════════════
-- Seguí el formato de arriba SIN agregar nada más. Sin saludo, sin introducción, sin cierre extra.
-- Usá negritas con *asteriscos* solo en el nombre del plan recomendado.
-- Máximo 80 palabras en total.
-- Tono directo, humano, como asesor de confianza.`;
-
-  const geminiBody = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 1024, temperature: 0.8, thinkingConfig: { thinkingBudget: 0 } }
-  };
-
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
-  );
-
-  if (!geminiRes.ok) {
-    const err = await geminiRes.json().catch(() => ({}));
-    throw new Error(err.error?.message || 'Error de Gemini (' + geminiRes.status + ')');
-  }
-
-  const geminiData = await geminiRes.json();
-  const texto = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  if (!texto) throw new Error('Gemini no devolvió texto.');
-
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.status(200).end(Buffer.from(JSON.stringify({ comparativa: texto.trim() }), 'utf8'));
-}
-
-// ─────────────────────────────────────────────
 // HELPER — beneficios exclusivos FedPat
 // ─────────────────────────────────────────────
 function buildBeneficiosFedpat(codigo, E) {
   const esCFull = ['CF', 'TD3'].includes(codigo);
 
   let bloque = `\uD83C\uDF81 *Beneficio Exclusivo FedPat:*\n`;
-  bloque += `\uD83D\uDE91 Asistencia en viaje y a las personas\n`;
+  bloque += `\uD83D\uDEE1\uFE0F Interasegurados \uD83D\uDE97\uD83D\uDCA5\uD83D\uDE97\n`;
   bloque += `\uD83E\uDE7A Accidentes personales ${esCFull ? 'conductor y asegurado' : 'conductor'}\n`;
-  if (esCFull) {
-    bloque += `\uD83D\uDCA5 Cristales, luneta, parabrisas y cerraduras\n`;
-  }
   bloque += `\uD83D\uDCCB Gestoría en caso de robo o destrucción total\n`;
   bloque += `\u2696\uFE0F Asesoramiento legal 24hs\n`;
   bloque += '\n';
