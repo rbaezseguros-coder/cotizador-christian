@@ -466,7 +466,7 @@ async function generarMensaje(req, res, apiKey) {
         const kmLabel = cob.grua_km === 'incluida' ? '' : ` ${cob.grua_km}`;
         itemsCubre.push(`\uD83D\uDD27 Asistencia con gr\u00faa${kmLabel}`);
       }
-      msg += `${E.check} ${itemsCubre.join(' + ')}\n`;
+      msg += `${itemsCubre.join(' + ')}\n`;
 
       // FIX A: ajuste automatico solo si no es plan solo tarjeta (A/A4)
       if (cob.ajuste_automatico && !esSoloTarjeta) {
