@@ -27,7 +27,7 @@ const BASE = {
     nombre: 'Sancor Seguros', facturacion: 'mensual',
     planes: {
       'Max Incendio': { cubre: ['Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Robo','Daños por accidente','Granizo'], todo_riesgo: false },
-      'Max 1':        { cubre: ['Responsabilidad Civil'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Asistencia','Granizo'], todo_riesgo: false },
+      'Max 1':        { cubre: ['Responsabilidad Civil','Extensión a países limítrofes'], beneficios: ['Asistencia Legal','Muerte Accidental','Invalidez por accidente','Asistencia Médico Farmacéutica'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Granizo'], todo_riesgo: false },
       'Max 3':        { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
       'Max Totales':  { cubre: ['Daños totales por accidente','Robo/Hurto e Incendio Total','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Robo parcial','Granizo','Daños parciales'], todo_riesgo: false },
       'Max 6':        { cubre: ['Daños por accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Cristales','Cerraduras'], todo_riesgo: false },
@@ -194,6 +194,7 @@ Devuelve SOLO un JSON válido sin markdown ni backticks:
       "precio_semestral": null,
       "precio_mensual": null,
       "precio_contado": "$220.984",
+      "beneficios": [],
       "cubre": ["Robo/Hurto e Incendio Total", "Destrucción Total por Accidente", "Responsabilidad Civil"],
       "no_cubre": ["Robo parcial", "Granizo", "Daños por accidente"]
     }
@@ -219,13 +220,13 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 ── GRÚA ──
 - El Norte: buscar "SOS XXXkm" en ADICIONALES → grua_km = "300km" (el número que figure)
 - FedPat: si dice "CON SERV. DE GRUA" → grua_km = "incluida"
-- Sancor: si dice "Asistencia al Vehículo y Personas" → grua_km = "incluida"
+- Sancor: si dice "Asistencia al Vehículo y Personas" → grua_km = "incluida" — EXCEPTO para Max 1 que siempre es grua_km = null
 - Si no menciona grúa → grua_km = null
 
 ── AJUSTE AUTOMÁTICO ──
 - El Norte: buscar "Ajuste automático: XX%" → ajuste_automatico = true
 - FedPat: buscar "AJUSTE AUTOMATICO SUMA ASEG." → ajuste_automatico = true
-- Sancor: buscar "Contempla Ajuste Automático Sumas Aseguradas" → ajuste_automatico = true
+- Sancor: la línea "Contempla Ajuste Automático Sumas Aseguradas" aparece como nota general del documento — NO la uses para ajuste_automatico. Para Sancor ajuste_automatico = false siempre salvo que esté indicado explícitamente dentro del detalle del plan cotizado.
 - Si no figura explícitamente → ajuste_automatico = false
 - IMPORTANTE: el ajuste automático NO es una franquicia. Son conceptos distintos. No pongas franquicia_valor cuando encuentres ajuste automático.
 
@@ -256,10 +257,14 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 - El PDF muestra: "Importe Mensual: $XX.XXX,XX"
 - precio_mensual = importe mensual redondeado sin decimales (ej: "$96.301")
 - precio_contado = null, precio_cuatrimestral = null, precio_semestral = null
+- Sancor Max 1: si el PDF muestra el monto de Responsabilidad Civil (ej: "$240.000.000,00"), reemplazar "Responsabilidad Civil" en el array cubre por "Responsabilidad Civil $240.000.000" (sin decimales, con puntos de miles)
 
 ── TODO RIESGO ──
 - todo_riesgo = true ÚNICAMENTE: Norte D, FedPat TD3, Sancor Todo Riesgo
 - todo_riesgo = false para todos los demás planes sin excepción (incluyendo Sancor Max 6 y Max Premium)
+
+- Sancor Max 1: campo "beneficios" = ["Asistencia Legal","Muerte Accidental","Invalidez por accidente","Asistencia Médico Farmacéutica"] — siempre fijo
+- Resto de planes: "beneficios" = []
 
 ── SOLO TARJETA CRÉDITO ──
 - solo_tarjeta_credito = true ÚNICAMENTE: Norte A, FedPat A4
@@ -371,6 +376,7 @@ async function generarMensaje(req, res, apiKey) {
       'Asistencia al vehículo':                     '🔧',
       'Asistencia completa':                        '🔧',
       'Asistencia en viaje':                        '🚑',
+      'Extensión a países limítrofes':              '🌍',
     };
 
     // Si hay multiples todo riesgo del mismo codigo, mostrar coberturas una sola vez arriba
@@ -484,6 +490,11 @@ async function generarMensaje(req, res, apiKey) {
       if (comp === 'fedpat' && !esSoloTarjeta) {
         msg += buildBeneficiosFedpat(cob.codigo, E);
       }
+
+      // Beneficios exclusivos Sancor Max 1
+      if (comp === 'sancor' && cob.codigo === 'Max 1') {
+        msg += buildBeneficiosSancor(cob);
+      }
     }
 
     // Separador entre companias en comparativa multi-compania
@@ -582,8 +593,27 @@ function buildBloqueDA(comp, E, cobsDeComp) {
 }
 
 // ─────────────────────────────────────────────
-// HELPER — beneficios exclusivos FedPat
+// HELPER — beneficios exclusivos Sancor Max 1
 // ─────────────────────────────────────────────
+function buildBeneficiosSancor(cob) {
+  const beneficios = cob.beneficios || BASE.sancor.planes['Max 1']?.beneficios || [];
+  if (!beneficios.length) return '';
+
+  const EMOJI_BENEF = {
+    'Asistencia Legal':                    '\u2696\uFE0F',  // ⚖️
+    'Muerte Accidental':                   '\uD83D\uDD4A\uFE0F', // 🕊️
+    'Invalidez por accidente':             '\uD83E\uDE7C',  // 🩼
+    'Asistencia Médico Farmacéutica':      '\uD83C\uDFE5',  // 🏥
+  };
+
+  let bloque = `\uD83C\uDF81 *Beneficio Exclusivo:*\n`;
+  for (const item of beneficios) {
+    const emoji = EMOJI_BENEF[item] || '';
+    bloque += `${emoji} ${item}\n`;
+  }
+  bloque += '\n';
+  return bloque;
+}
 function buildBeneficiosFedpat(codigo, E) {
   const esCFull = ['CF', 'TD3'].includes(codigo);
 
