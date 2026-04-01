@@ -255,7 +255,7 @@ REGLAS ESTRICTAS — LEER CON ATENCIÓN
 
 ── PRECIOS SANCOR ──
 - El PDF muestra: "Importe Mensual: $XX.XXX,XX"
-- precio_mensual = importe mensual redondeado sin decimales (ej: "$96.301")
+- precio_mensual = importe mensual CON decimales tal como figura en el PDF (ej: "$60.168,29") — el backend se encarga de redondear
 - precio_contado = null, precio_cuatrimestral = null, precio_semestral = null
 - Sancor Max 1: si el PDF muestra el monto de Responsabilidad Civil (ej: "$240.000.000,00"), reemplazar "Responsabilidad Civil" en el array cubre por "Responsabilidad Civil $240.000.000" (sin decimales, con puntos de miles)
 
@@ -379,12 +379,19 @@ async function generarMensaje(req, res, apiKey) {
       'Extensión a países limítrofes':              '🌍',
     };
 
+    // Busca emoji exacto o por prefijo (ej: "Responsabilidad Civil $240.000.000" → 🛡️)
+    const getEmojiCober = (item) => {
+      if (EMOJI_COBER[item]) return EMOJI_COBER[item];
+      const clave = Object.keys(EMOJI_COBER).find(k => item.startsWith(k));
+      return clave ? EMOJI_COBER[clave] : null;
+    };
+
     // Si hay multiples todo riesgo del mismo codigo, mostrar coberturas una sola vez arriba
     if (hayMultiTodoRiesgoMismoCodigo) {
       const primera = cobsDeComp.find(c => c.todo_riesgo === true);
       msg += `${E.estrella} *Todo Riesgo*\n`;
       const itemsCubreTR = (primera.cubre || []).map(item => {
-        const emoji = EMOJI_COBER[item];
+        const emoji = getEmojiCober(item);
         return emoji ? `${emoji} ${item}` : item;
       });
       if (primera.grua_km) {
@@ -452,7 +459,7 @@ async function generarMensaje(req, res, apiKey) {
 
       // Coberturas en una linea + Grua
       const itemsCubre = (cob.cubre || []).map(item => {
-        const emoji = EMOJI_COBER[item];
+        const emoji = getEmojiCober(item);
         return emoji ? `${emoji} ${item}` : item;
       });
       if (cob.grua_km) {
