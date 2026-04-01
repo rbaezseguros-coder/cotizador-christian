@@ -475,25 +475,26 @@ async function generarMensaje(req, res, apiKey) {
         }
       }
 
-      // Precio
-      msg += buildPrecioLinea(cob, E);
-      msg += '\n';
+      // Beneficios exclusivos FedPat
+      if (comp === 'fedpat' && !esSoloTarjeta) {
+        msg += buildBeneficiosFedpat(cob.codigo, E);
+      }
+
+      // Sancor Max 1: beneficios primero, precio al final para que el cliente lea todo
+      if (comp === 'sancor' && cob.codigo === 'Max 1') {
+        msg += buildBeneficiosSancor(cob);
+        msg += buildPrecioLinea(cob, E);
+        msg += '\n';
+      } else {
+        msg += buildPrecioLinea(cob, E);
+        msg += '\n';
+      }
 
       // DA solo despues del ULTIMO plan normal (no A/A4), si hay plan A/A4 en la comparativa
       const esUltimoPlanNormal = hayPlanSoloTarjeta && hayPlanesNormales && !esSoloTarjeta &&
         cobsDeComp.filter(c => !c.solo_tarjeta_credito).slice(-1)[0]?.id === cob.id;
       if (esUltimoPlanNormal) {
         msg += buildBloqueDA(comp, E, cobsDeComp);
-      }
-
-      // Beneficios exclusivos FedPat
-      if (comp === 'fedpat' && !esSoloTarjeta) {
-        msg += buildBeneficiosFedpat(cob.codigo, E);
-      }
-
-      // Beneficios exclusivos Sancor Max 1
-      if (comp === 'sancor' && cob.codigo === 'Max 1') {
-        msg += buildBeneficiosSancor(cob);
       }
     }
 
