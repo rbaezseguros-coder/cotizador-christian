@@ -1,6 +1,9 @@
 const BASE = {
   norte: {
     nombre: 'El Norte Seguros', facturacion: 'cuatrimestral',
+    planesMoto: {
+      'A': { cubre: ['Responsabilidad Civil por daños a terceros'], no_cubre: ['Robo','Incendio propio','Daños por accidente'], todo_riesgo: false, solo_tarjeta_credito: true },
+    },
     planes: {
       'D':  { cubre: ['Daños Parciales por Accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Cristales y Cerraduras','Responsabilidad Civil'], no_cubre: [], todo_riesgo: true },
       'C':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Granizo','Responsabilidad Civil'], no_cubre: ['Daños por accidente'], todo_riesgo: false },
@@ -13,6 +16,9 @@ const BASE = {
   },
   fedpat: {
     nombre: 'Federación Patronal', facturacion: 'semestral',
+    planesMoto: {
+      'A4': { cubre: ['Responsabilidad Civil límite máximo'], no_cubre: ['Robo','Incendio propio','Daños por accidente'], todo_riesgo: false, solo_tarjeta_credito: true },
+    },
     planes: {
       'TD3': { cubre: ['Daños Parciales por Accidente','Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Responsabilidad Civil','Cristales, lunetas, parabrisas y Cerraduras'], no_cubre: ['Granizo'], todo_riesgo: true },
       'CF':  { cubre: ['Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Responsabilidad Civil','Cristales y Cerraduras'], no_cubre: ['Daños por accidente','Granizo'], todo_riesgo: false },
@@ -25,6 +31,9 @@ const BASE = {
   },
   sancor: {
     nombre: 'Sancor Seguros', facturacion: 'mensual',
+    planesMoto: {
+      'Max 1': { cubre: ['Responsabilidad Civil','Extensión a países limítrofes'], beneficios: ['Asistencia Legal','Muerte Accidental','Invalidez por accidente','Asistencia Médico Farmacéutica'], no_cubre: ['Robo','Incendio propio','Daños por accidente'], todo_riesgo: false },
+    },
     planes: {
       'Max Incendio': { cubre: ['Incendio Total y Parcial','Destrucción Total','Responsabilidad Civil','Asistencia al vehículo'], no_cubre: ['Robo','Daños por accidente','Granizo'], todo_riesgo: false },
       'Max 1':        { cubre: ['Responsabilidad Civil','Extensión a países limítrofes'], beneficios: ['Asistencia Legal','Muerte Accidental','Invalidez por accidente','Asistencia Médico Farmacéutica'], no_cubre: ['Robo','Incendio propio','Daños por accidente','Granizo'], todo_riesgo: false },
@@ -121,7 +130,10 @@ async function analizarPDFs(req, res, apiKey) {
 
   // ── MERGE: tomar vehículo del primero, coberturas de todos ──
   const cotizacion = {
-    vehiculo: resultados[0].vehiculo,
+    vehiculo: {
+      ...resultados[0].vehiculo,
+      tipo_vehiculo: resultados[0].vehiculo?.tipo_vehiculo || 'auto'
+    },
     coberturas: resultados.flatMap(r => r.coberturas || [])
   };
 
@@ -172,6 +184,7 @@ Devuelve SOLO un JSON válido sin markdown ni backticks:
 {
   "vehiculo": {
     "descripcion": "Marca Modelo Año — exactamente como figura en el PDF",
+    "tipo_vehiculo": "auto",
     "patente": "ABC123 o null si no figura",
     "valor": "$XX.XXX.XXX o null",
     "ubicacion": "Ciudad"
@@ -205,7 +218,28 @@ Devuelve SOLO un JSON válido sin markdown ni backticks:
 REGLAS ESTRICTAS — LEER CON ATENCIÓN
 ════════════════════════════════════════
 
-── NOMBRE DEL PLAN ──
+── TIPO DE VEHÍCULO ──
+- Si el encabezado del PDF dice "MOTOVEHÍCULOS" o "MOTOVEHICULOS" → tipo_vehiculo = "moto"
+- En cualquier otro caso → tipo_vehiculo = "auto"
+
+── PLANES DE MOTO ──
+Cuando tipo_vehiculo = "moto", los planes válidos son los de planesMoto en la BASE DE CONOCIMIENTO.
+- Norte moto: plan "A" → solo_tarjeta_credito = true (igual que auto A)
+- FedPat moto: plan "A4" → solo_tarjeta_credito = true (igual que auto A4)
+- Sancor moto: plan "Max 1" → mismo comportamiento que Max 1 de autos (grua_km = null, ajuste_automatico = false, beneficios fijos, precio mensual con decimales, RC con monto extraído del PDF)
+- FedPat moto: los "PRODUCTOS INTEGRALES" (ACCIDENTAL MOTOCICLISTAS, SALUD PARA MOTOCICLISTAS) NO van en "cubre" — son beneficios adicionales fijos de la compañía
+- El Norte moto: el adicional "FAMILIA PROTEGIDA" NO va en "cubre" — es beneficio fijo de la compañía
+
+── PRECIOS EL NORTE MOTO ──
+- Igual que auto: precio_contado = columna "Contado", precio_cuatrimestral = columna "4 Cuotas de"
+
+── PRECIOS FEDPAT MOTO ──
+- Igual que auto: precio_semestral = valor de cada cuota, precio_contado = monto contado
+
+── PRECIOS SANCOR MOTO ──
+- Igual que auto Max 1: precio_mensual con decimales tal como figura en el PDF
+
+
 - Usar SIEMPRE el nombre corto y limpio: "Plan B", "Plan C", "Plan D", "Plan TD3", "Max Totales", etc.
 - NUNCA copiar el texto largo del PDF como "PLAN B RC.PERD TOTAL Accid. Inc. y Robo"
 - El nombre limpio está en la BASE DE CONOCIMIENTO
@@ -288,6 +322,8 @@ async function generarMensaje(req, res, apiKey) {
   const { vehiculo, coberturas, nombreCliente } = req.body;
 
   const nombre = nombreCliente || 'cliente';
+  const esMoto = vehiculo?.tipo_vehiculo === 'moto';
+  const labelVehiculo = esMoto ? 'moto' : 'vehículo';
   const companias = [...new Set(coberturas.map(c => c.compania))];
   const hayMultiCompania = companias.length > 1;
   const E = {
@@ -318,9 +354,9 @@ async function generarMensaje(req, res, apiKey) {
   // ── ENCABEZADO ──
   if (!hayMultiCompania) {
     const comp = companias[0];
-    msg += `${E.saludo} *¡Hola ${nombre}!* Te paso la cotización de *${NOMBRE_COMP[comp]}* para tu vehículo:\n\n`;
+    msg += `${E.saludo} *¡Hola ${nombre}!* Te paso la cotización de *${NOMBRE_COMP[comp]}* para tu ${labelVehiculo}:\n\n`;
   } else {
-    msg += `${E.saludo} *¡Hola ${nombre}!* Te paso la cotización para tu vehículo:\n\n`;
+    msg += `${E.saludo} *¡Hola ${nombre}!* Te paso la cotización para tu ${labelVehiculo}:\n\n`;
   }
 
   const descVehiculo = vehiculo.descripcion
@@ -484,7 +520,12 @@ async function generarMensaje(req, res, apiKey) {
 
       // Beneficios exclusivos FedPat
       if (comp === 'fedpat' && !esSoloTarjeta) {
-        msg += buildBeneficiosFedpat(cob.codigo, E);
+        msg += buildBeneficiosFedpat(cob.codigo, E, esMoto);
+      }
+
+      // Adicional El Norte moto: FAMILIA PROTEGIDA (siempre)
+      if (comp === 'norte' && esMoto) {
+        msg += buildBeneficiosNorteMoto(E);
       }
 
       // Sancor Max 1: beneficios primero, precio al final para que el cliente lea todo
@@ -622,15 +663,27 @@ function buildBeneficiosSancor(cob) {
   bloque += '\n';
   return bloque;
 }
-function buildBeneficiosFedpat(codigo, E) {
-  const esCFull = ['CF', 'TD3'].includes(codigo);
-
+function buildBeneficiosFedpat(codigo, E, esMoto = false) {
   let bloque = `\uD83C\uDF81 *Beneficio Exclusivo FedPat:*\n`;
-  bloque += `\uD83D\uDEE1\uFE0F Interasegurados \uD83D\uDE97\uD83D\uDCA5\uD83D\uDE97\n`;
-  bloque += `\uD83E\uDE7A Accidentes personales ${esCFull ? 'conductor y asegurado' : 'conductor'}\n`;
-  bloque += `\uD83D\uDCCB Gestoría en caso de robo o destrucción total\n`;
-  bloque += `\u2696\uFE0F Asesoramiento legal 24hs\n`;
-  bloque += '\n';
 
+  if (esMoto) {
+    bloque += `\uD83C\uDFC4 Accidental Motociclistas: Invalidez $2.000.000 | Muerte Accidental $2.000.000\n`;
+    bloque += `\uD83C\uDFE5 Salud para Motociclistas: Fractura de huesos $250.000 | Órtesis y ortopedia $1.600.000\n`;
+  } else {
+    const esCFull = ['CF', 'TD3'].includes(codigo);
+    bloque += `\uD83D\uDEE1\uFE0F Interasegurados \uD83D\uDE97\uD83D\uDCA5\uD83D\uDE97\n`;
+    bloque += `\uD83E\uDE7A Accidentes personales ${esCFull ? 'conductor y asegurado' : 'conductor'}\n`;
+    bloque += `\uD83D\uDCCB Gestoría en caso de robo o destrucción total\n`;
+    bloque += `\u2696\uFE0F Asesoramiento legal 24hs\n`;
+  }
+
+  bloque += '\n';
+  return bloque;
+}
+
+function buildBeneficiosNorteMoto(E) {
+  let bloque = `\uD83C\uDF81 *Beneficio Exclusivo El Norte:*\n`;
+  bloque += `\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67 Familia Protegida — cobertura duplicada para el grupo familiar\n`;
+  bloque += '\n';
   return bloque;
 }
