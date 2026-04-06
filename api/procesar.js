@@ -344,6 +344,7 @@ async function generarMensaje(req, res, apiKey) {
     norte:   '\uD83D\uDD35',  // 🔵
     fedpat:  '\uD83D\uDD34',  // 🔴
     sancor:  '\uD83D\uDFE3',  // 🟣
+    moto:    '\uD83C\uDFCD\uFE0F', // 🏍️
   };
 
   const EMOJI_COMP = { norte: E.norte, fedpat: E.fedpat, sancor: E.sancor };
@@ -362,7 +363,7 @@ async function generarMensaje(req, res, apiKey) {
   const descVehiculo = vehiculo.descripcion
     .replace(/\bvolkswagen\s+vw\b/gi, 'Volkswagen')
     .replace(/\bvw\s+volkswagen\b/gi, 'Volkswagen');
-  msg += `${E.auto} *${descVehiculo.toUpperCase()}*\n`;
+  msg += `${esMoto ? E.moto : E.auto} *${descVehiculo.toUpperCase()}*\n`;
 
   if (!hayMultiCompania) {
     const numCot = coberturas[0]?.numero_cotizacion || null;
@@ -519,7 +520,7 @@ async function generarMensaje(req, res, apiKey) {
       }
 
       // Beneficios exclusivos FedPat
-      if (comp === 'fedpat' && !esSoloTarjeta) {
+      if (comp === 'fedpat' && (!esSoloTarjeta || esMoto)) {
         msg += buildBeneficiosFedpat(cob.codigo, E, esMoto);
       }
 
