@@ -278,7 +278,7 @@ input[type="file"] { display: none; }
     <div class="panel-sub">Seleccioná las que querés presentar. Podés mezclar compañías libremente.</div>
 
     <div class="vehiculo-chip">
-      <div class="vc-icon">🚘</div>
+      <div class="vc-icon" id="vcIcon">🚘</div>
       <div class="vc-info">
         <h3 id="vcNombre">—</h3>
         <p id="vcDetalle">—</p>
@@ -496,6 +496,7 @@ function mostrarCoberturas() {
     v.valor && 'Valor: ' + v.valor,
     v.ubicacion
   ].filter(Boolean).join(' · ');
+  document.getElementById('vcIcon').textContent = v.tipo_vehiculo === 'moto' ? '🏍️' : '🚘';
 
   const comps = [...new Set(cotizacion.coberturas.map(c => c.compania))];
   const nombres = { norte: 'El Norte', fedpat: 'Fed. Patronal', sancor: 'Sancor' };
@@ -667,7 +668,8 @@ async function generarMensaje() {
         vehiculo: cotizacion.vehiculo,
         coberturas: sels,
         esComparativa: sels.length > 1,
-        hayMultiCompania: hayMulti
+        hayMultiCompania: hayMulti,
+        tipoPrecio: tipoPrecioPorCompania
       })
     });
 
