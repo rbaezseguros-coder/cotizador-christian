@@ -2,7 +2,7 @@ const BASE = {
   norte: {
     nombre: 'El Norte Seguros', facturacion: 'cuatrimestral',
     planesMoto: {
-      'A': { cubre: ['Responsabilidad Civil por daños a terceros'], no_cubre: ['Robo','Incendio propio','Daños por accidente'], todo_riesgo: false, solo_tarjeta_credito: true },
+      'A': { cubre: ['Responsabilidad Civil por daños a terceros'], no_cubre: ['Robo','Incendio propio','Daños por accidente'], todo_riesgo: false, solo_tarjeta_credito: false },
     },
     planes: {
       'D':  { cubre: ['Daños Parciales por Accidente','Robo/Hurto e Incendio Total y Parcial','Inundación','Granizo','Cristales y Cerraduras','Responsabilidad Civil'], no_cubre: [], todo_riesgo: true },
@@ -17,7 +17,7 @@ const BASE = {
   fedpat: {
     nombre: 'Federación Patronal', facturacion: 'semestral',
     planesMoto: {
-      'A4': { cubre: ['Responsabilidad Civil límite máximo'], no_cubre: ['Robo','Incendio propio','Daños por accidente'], todo_riesgo: false, solo_tarjeta_credito: true },
+      'A4': { cubre: ['Responsabilidad Civil límite máximo'], no_cubre: ['Robo','Incendio propio','Daños por accidente'], todo_riesgo: false, solo_tarjeta_credito: false },
     },
     planes: {
       'TD3': { cubre: ['Daños Parciales por Accidente','Robo/Hurto e Incendio Total y Parcial','Destrucción Total por Accidente','Responsabilidad Civil','Cristales, lunetas, parabrisas y Cerraduras'], no_cubre: ['Granizo'], todo_riesgo: true },
@@ -301,8 +301,8 @@ Cuando tipo_vehiculo = "moto", los planes válidos son los de planesMoto en la B
 - Resto de planes: "beneficios" = []
 
 ── SOLO TARJETA CRÉDITO ──
-- solo_tarjeta_credito = true ÚNICAMENTE: Norte A, FedPat A4
-- solo_tarjeta_credito = false para todos los demás planes
+- solo_tarjeta_credito = true ÚNICAMENTE: Norte A (auto), FedPat A4 (auto)
+- Para motos: solo_tarjeta_credito = false siempre, sin excepción
 
 ── NÚMERO DE COTIZACIÓN ──
 - El número de cotización va DENTRO de cada cobertura, no en la raíz
@@ -601,7 +601,11 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
     if (modoNorte === 'contado') {
       return contado ? `${E.dinero} *Contado: ${contado}*\n` : '';
     }
-    return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
+    // cuotas: mostrar contado + cuotas (el DA va en bloque separado)
+    let l = '';
+    if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
+    if (cuatri)  l += `${E.tarjeta} *4 cuotas de ${cuatri}*\n`;
+    return l;
   }
 
   if (comp === 'fedpat') {
@@ -614,7 +618,11 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
     if (modoFedpat === 'contado') {
       return contado ? `${E.dinero} *Contado: ${contado}*\n` : '';
     }
-    return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
+    // cuotas: mostrar contado + cuotas (el DA va en bloque separado)
+    let l = '';
+    if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
+    if (semest)  l += `${E.tarjeta} *6 cuotas de ${semest}*\n`;
+    return l;
   }
 
   if (comp === 'sancor') {
