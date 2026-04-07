@@ -319,7 +319,10 @@ RECORDÁ: Solo extraé lo que está en el PDF. No inventes, no completés, no ag
 // GENERAR MENSAJE WHATSAPP — armado en backend sin Gemini
 // ─────────────────────────────────────────────
 async function generarMensaje(req, res, apiKey) {
-  const { vehiculo, coberturas, nombreCliente } = req.body;
+  const { vehiculo, coberturas, nombreCliente, tipoPrecio } = req.body;
+  // tipoPrecio: { norte: 'cuotas'|'contado', fedpat: 'cuotas'|'contado', sancor: 'mensual' }
+  const modoNorte  = (tipoPrecio?.norte  || 'cuotas');
+  const modoFedpat = (tipoPrecio?.fedpat || 'cuotas');
 
   const nombre = nombreCliente || 'cliente';
   const esMoto = vehiculo?.tipo_vehiculo === 'moto';
@@ -482,7 +485,7 @@ async function generarMensaje(req, res, apiKey) {
           franqLabel = `Franquicia ${cob.franquicia_valor}${montoLabel}`;
         }
         msg += `${E.franq} *Opci\u00f3n ${numOpcion} \u2014 ${franqLabel}*\n`;
-        msg += buildPrecioLinea(cob, E);
+        msg += buildPrecioLinea(cob, E, modoNorte, modoFedpat);
         msg += '\n';
         continue;
       }
@@ -532,10 +535,10 @@ async function generarMensaje(req, res, apiKey) {
       // Sancor Max 1: beneficios primero, precio al final para que el cliente lea todo
       if (comp === 'sancor' && cob.codigo === 'Max 1') {
         msg += buildBeneficiosSancor(cob);
-        msg += buildPrecioLinea(cob, E);
+        msg += buildPrecioLinea(cob, E, modoNorte, modoFedpat);
         msg += '\n';
       } else {
-        msg += buildPrecioLinea(cob, E);
+        msg += buildPrecioLinea(cob, E, modoNorte, modoFedpat);
         msg += '\n';
       }
 
@@ -579,7 +582,7 @@ function formatPrecio(valor) {
   return '$' + num.toLocaleString('es-AR', { maximumFractionDigits: 0 });
 }
 
-function buildPrecioLinea(cob, E) {
+function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
   const comp = cob.compania;
   const esSoloTarjeta = cob.solo_tarjeta_credito === true;
 
@@ -591,10 +594,12 @@ function buildPrecioLinea(cob, E) {
   if (comp === 'norte') {
     if (esSoloTarjeta) {
       let l = '';
-      // ── FIX C: aclaración entre paréntesis y sin negrita ──
       if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
       if (cuatri)  l += `${E.tarjeta} *4 cuotas de ${cuatri}* (solo mediante Débito Automático con Tarjeta de Crédito)\n`;
       return l;
+    }
+    if (modoNorte === 'contado') {
+      return contado ? `${E.dinero} *Contado: ${contado}*\n` : '';
     }
     return cuatri ? `${E.dinero} *4 cuotas de ${cuatri}*\n` : '';
   }
@@ -602,21 +607,21 @@ function buildPrecioLinea(cob, E) {
   if (comp === 'fedpat') {
     if (esSoloTarjeta) {
       let l = '';
-      // ── FIX C: aclaración entre paréntesis y sin negrita ──
       if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
       if (semest)  l += `${E.tarjeta} *6 cuotas de ${semest}* (solo mediante Débito Automático con Tarjeta de Crédito)\n`;
       return l;
+    }
+    if (modoFedpat === 'contado') {
+      return contado ? `${E.dinero} *Contado: ${contado}*\n` : '';
     }
     return semest ? `${E.dinero} *6 cuotas de ${semest}*\n` : '';
   }
 
   if (comp === 'sancor') {
     if (!mensual) return '';
-    // Max 1: solo tarjeta de crédito (DA obligatorio)
     if (cob.codigo === 'Max 1') {
       return `${E.tarjeta} *${mensual}/mes* (solo mediante Débito Automático con Tarjeta de Crédito)\n`;
     }
-    // Resto de planes: precio normal, el DA va en bloque separado
     return `${E.dinero} *${mensual}/mes*\n`;
   }
 
@@ -668,7 +673,7 @@ function buildBeneficiosFedpat(codigo, E, esMoto = false) {
   let bloque = `\uD83C\uDF81 *Beneficio Exclusivo FedPat:*\n`;
 
   if (esMoto) {
-    bloque += `\uD83C\uDFC4 Accidental Motociclistas: Invalidez $2.000.000 | Muerte Accidental $2.000.000\n`;
+    bloque += `\uD83E\uDE7A Accidental Motociclistas: Invalidez $2.000.000 | Muerte Accidental $2.000.000\n`;
     bloque += `\uD83C\uDFE5 Salud para Motociclistas: Fractura de huesos $250.000 | Órtesis y ortopedia $1.600.000\n`;
   } else {
     const esCFull = ['CF', 'TD3'].includes(codigo);
