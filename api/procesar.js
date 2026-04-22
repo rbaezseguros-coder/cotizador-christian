@@ -344,6 +344,7 @@ async function generarMensaje(req, res, apiKey) {
     ok:      '\uD83D\uDC4D',  // 👍
     sonrisa: '\uD83D\uDE0A',  // 😊
     maletin: '\uD83D\uDCBC',  // 💼
+    mp:      '\uD83D\uDCF1',  // 📱
     norte:   '\uD83D\uDD35',  // 🔵
     fedpat:  '\uD83D\uDD34',  // 🔴
     sancor:  '\uD83D\uDFE3',  // 🟣
@@ -546,7 +547,7 @@ async function generarMensaje(req, res, apiKey) {
       const esUltimoPlanNormal = hayPlanSoloTarjeta && hayPlanesNormales && !esSoloTarjeta &&
         cobsDeComp.filter(c => !c.solo_tarjeta_credito).slice(-1)[0]?.id === cob.id;
       if (esUltimoPlanNormal) {
-        msg += buildBloqueDA(comp, E, cobsDeComp);
+        msg += buildBloqueDA(comp, E, cobsDeComp, modoNorte, modoFedpat);
       }
     }
 
@@ -557,7 +558,7 @@ async function generarMensaje(req, res, apiKey) {
     // - Si es multi todo riesgo: ya se agrego arriba, no repetir
     // - Si hay plan A/A4: ya se agrego inline, no repetir
     if (!hayPlanSoloTarjeta && !hayMultiTodoRiesgoMismoCodigo) {
-      msg += buildBloqueDA(comp, E, cobsDeComp);
+      msg += buildBloqueDA(comp, E, cobsDeComp, modoNorte, modoFedpat);
     }
   }
 
@@ -604,7 +605,7 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
     // cuotas: mostrar contado + cuotas (el DA va en bloque separado)
     let l = '';
     if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
-    if (cuatri)  l += `${E.tarjeta} *4 cuotas de ${cuatri}*\n`;
+    if (cuatri)  l += `${E.tarjeta} *Pago mensual: ${cuatri}*\n`;
     return l;
   }
 
@@ -621,7 +622,7 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
     // cuotas: mostrar contado + cuotas (el DA va en bloque separado)
     let l = '';
     if (contado) l += `${E.dinero} *Contado: ${contado}*\n`;
-    if (semest)  l += `${E.tarjeta} *6 cuotas de ${semest}*\n`;
+    if (semest)  l += `${E.tarjeta} *Pago mensual: ${semest}*\n`;
     return l;
   }
 
@@ -639,18 +640,22 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
 // ─────────────────────────────────────────────
 // HELPER — bloque débito automático
 // ─────────────────────────────────────────────
-function buildBloqueDA(comp, E, cobsDeComp) {
+function buildBloqueDA(comp, E, cobsDeComp, modoNorte, modoFedpat) {
   if (comp === 'norte') {
-    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día y 5% adicional de descuento*\n\n`;
+    // Si eligió contado, no mostrar bloque DA
+    if (modoNorte === 'contado') return '';
+    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día y 5% adicional de descuento* / ${E.mp} *Mercado Pago*\n\n`;
   }
   if (comp === 'fedpat') {
-    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día*\n\n`;
+    // Si eligió contado, no mostrar bloque DA
+    if (modoFedpat === 'contado') return '';
+    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día* / ${E.mp} *Mercado Pago*\n\n`;
   }
   if (comp === 'sancor') {
     // Si todos los planes de Sancor son Max 1, ya tienen DA inline — no generar bloque
     const soloMax1 = (cobsDeComp || []).every(c => c.codigo === 'Max 1');
     if (soloMax1) return '';
-    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día*\n\n`;
+    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día* / ${E.mp} *Mercado Pago*\n\n`;
   }
   return '';
 }
