@@ -1,0 +1,23 @@
+{
+  "name": "Cotizador Pro — Christian Sanchez PAS",
+  "short_name": "Cotizador",
+  "description": "Cotizador de seguros multi-compañía con IA",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f3ef",
+  "theme_color": "#1a1714",
+  "icons": [
+    { "src": "/002.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "share_target": {
+    "action": "/api/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        { "name": "pdfs", "accept": ["application/pdf"], "multiple": true }
+      ]
+    }
+  }
+}
