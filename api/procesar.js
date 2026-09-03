@@ -75,9 +75,6 @@ async function analizarPDFs(req, res, apiKey) {
   const { pdfs } = req.body;
   if (!pdfs || !pdfs.length) return res.status(400).end(JSON.stringify({ error: 'No se recibieron PDFs' }));
 
-  // ── Si hay un solo PDF: flujo original ──
-  // ── Si hay múltiples: procesar cada uno por separado y validar vehículos en backend ──
-
   async function extraerUnPDF(pdf, indice, total) {
     const parts = [];
     parts.push({ text: `=== PDF ${indice + 1} de ${total}: ${pdf.nombre} ===` });
@@ -111,10 +108,8 @@ async function analizarPDFs(req, res, apiKey) {
     }
   }
 
-  // Extraer todos los PDFs (en paralelo para mayor velocidad)
   const resultados = await Promise.all(pdfs.map((pdf, i) => extraerUnPDF(pdf, i, pdfs.length)));
 
-  // ── VALIDACIÓN DE VEHÍCULOS EN BACKEND ──
   if (pdfs.length > 1) {
     const vehiculos = resultados.map(r => normalizarVehiculo(r.vehiculo?.descripcion || ''));
     const vehiculoBase = vehiculos[0];
@@ -128,7 +123,6 @@ async function analizarPDFs(req, res, apiKey) {
     }
   }
 
-  // ── MERGE: tomar vehículo del primero, coberturas de todos ──
   const cotizacion = {
     vehiculo: {
       ...resultados[0].vehiculo,
@@ -141,7 +135,6 @@ async function analizarPDFs(req, res, apiKey) {
   res.status(200).end(Buffer.from(JSON.stringify(cotizacion), 'utf8'));
 }
 
-// ── Normalizar descripción de vehículo para comparación ──
 function normalizarVehiculo(desc) {
   return desc
     .toLowerCase()
@@ -151,16 +144,12 @@ function normalizarVehiculo(desc) {
     .trim();
 }
 
-// ── Comparar dos vehículos: deben compartir al menos marca + modelo + año ──
 function vehiculosSonIguales(a, b) {
   if (!a || !b) return false;
-  // Extraer tokens significativos (ignorar palabras muy cortas)
   const tokensA = new Set(a.split(' ').filter(t => t.length > 2));
   const tokensB = new Set(b.split(' ').filter(t => t.length > 2));
-  // Contar cuántos tokens coinciden
   let coincidencias = 0;
   for (const t of tokensA) { if (tokensB.has(t)) coincidencias++; }
-  // Deben coincidir al menos 3 tokens (marca, modelo, año aprox)
   return coincidencias >= 3;
 }
 
@@ -386,11 +375,9 @@ async function generarMensaje(req, res, apiKey) {
       msg += '\n';
     }
 
-    // ── FIX B: detectar si hay algún plan A/A4 en esta compañía ──
     const hayPlanSoloTarjeta = cobsDeComp.some(c => c.solo_tarjeta_credito === true);
     const hayPlanesNormales  = cobsDeComp.some(c => c.solo_tarjeta_credito !== true);
 
-    // FIX E: detectar grupos de todo riesgo con mismo codigo (ej: multiples Plan D)
     const codsToRiesgo = cobsDeComp
       .filter(c => c.todo_riesgo === true)
       .map(c => c.codigo);
@@ -420,14 +407,12 @@ async function generarMensaje(req, res, apiKey) {
       'Extensión a países limítrofes':              '🌍',
     };
 
-    // Busca emoji exacto o por prefijo (ej: "Responsabilidad Civil $240.000.000" → 🛡️)
     const getEmojiCober = (item) => {
       if (EMOJI_COBER[item]) return EMOJI_COBER[item];
       const clave = Object.keys(EMOJI_COBER).find(k => item.startsWith(k));
       return clave ? EMOJI_COBER[clave] : null;
     };
 
-    // Si hay multiples todo riesgo del mismo codigo, mostrar coberturas una sola vez arriba
     if (hayMultiTodoRiesgoMismoCodigo) {
       const primera = cobsDeComp.find(c => c.todo_riesgo === true);
       msg += `${E.estrella} *Todo Riesgo*\n`;
@@ -452,7 +437,6 @@ async function generarMensaje(req, res, apiKey) {
       const esUnica        = cobsDeComp.length === 1;
       const numOpcion      = idx + 1;
 
-      // NOMBRE DEL PLAN
       let nombrePlan;
       if (esRecomendado) {
         if (cob.franquicia_valor) {
@@ -472,8 +456,6 @@ async function generarMensaje(req, res, apiKey) {
         nombrePlan = cob.nombre;
       }
 
-      // FIX E: si es grupo de multiples todo riesgo del mismo codigo,
-      // mostrar solo franquicia + precio (sin repetir coberturas)
       if (hayMultiTodoRiesgoMismoCodigo && esRecomendado) {
         let franqLabel;
         if (cob.franquicia_tipo === 'fija') {
@@ -487,18 +469,17 @@ async function generarMensaje(req, res, apiKey) {
         }
         msg += `${E.franq} *Opci\u00f3n ${numOpcion} \u2014 ${franqLabel}*\n`;
         msg += buildPrecioLinea(cob, E, modoNorte, modoFedpat);
+        msg += aplicarEspaciadoFrase(buildFrasePrecioFijo(comp, E, modoNorte, modoFedpat));
         msg += '\n';
         continue;
       }
 
-      // Titulo normal
       if (esUnica) {
         msg += `${esRecomendado ? E.estrella : E.escudo} *${nombrePlan}*\n`;
       } else {
         msg += `${esRecomendado ? E.estrella : E.escudo} *Opci\u00f3n ${numOpcion} \u2014 ${nombrePlan}*\n`;
       }
 
-      // Coberturas en una linea + Grua
       const itemsCubre = (cob.cubre || []).map(item => {
         const emoji = getEmojiCober(item);
         return emoji ? `${emoji} ${item}` : item;
@@ -509,12 +490,10 @@ async function generarMensaje(req, res, apiKey) {
       }
       msg += `${itemsCubre.join(' + ')}\n`;
 
-      // FIX A: ajuste automatico solo si no es plan solo tarjeta (A/A4)
       if (cob.ajuste_automatico && !esSoloTarjeta) {
         msg += `\uD83D\uDCC8 *Suma asegurada con ajuste autom\u00e1tico*\n`;
       }
 
-      // Franquicia en linea solo para planes no todo riesgo
       if (!esRecomendado && cob.franquicia_valor) {
         if (cob.franquicia_tipo === 'fija') {
           msg += `${E.franq} *Franquicia fija: ${cob.franquicia_valor}*\n`;
@@ -523,12 +502,10 @@ async function generarMensaje(req, res, apiKey) {
         }
       }
 
-      // Beneficios exclusivos FedPat
       if (comp === 'fedpat' && (!esSoloTarjeta || esMoto)) {
         msg += buildBeneficiosFedpat(cob.codigo, E, esMoto);
       }
 
-      // Adicional El Norte moto: FAMILIA PROTEGIDA (siempre)
       if (comp === 'norte' && esMoto) {
         msg += buildBeneficiosNorteMoto(E);
       }
@@ -537,13 +514,14 @@ async function generarMensaje(req, res, apiKey) {
       if (comp === 'sancor' && cob.codigo === 'Max 1') {
         msg += buildBeneficiosSancor(cob);
         msg += buildPrecioLinea(cob, E, modoNorte, modoFedpat);
+        msg += aplicarEspaciadoFrase(buildFrasePrecioFijo(comp, E, modoNorte, modoFedpat));
         msg += '\n';
       } else {
         msg += buildPrecioLinea(cob, E, modoNorte, modoFedpat);
+        msg += aplicarEspaciadoFrase(buildFrasePrecioFijo(comp, E, modoNorte, modoFedpat));
         msg += '\n';
       }
 
-      // DA solo despues del ULTIMO plan normal (no A/A4), si hay plan A/A4 en la comparativa
       const esUltimoPlanNormal = hayPlanSoloTarjeta && hayPlanesNormales && !esSoloTarjeta &&
         cobsDeComp.filter(c => !c.solo_tarjeta_credito).slice(-1)[0]?.id === cob.id;
       if (esUltimoPlanNormal) {
@@ -551,19 +529,17 @@ async function generarMensaje(req, res, apiKey) {
       }
     }
 
-    // Separador entre companias en comparativa multi-compania
-    if (hayMultiCompania) msg += '---\n\n';
-
-    // Bloque DA al final: una sola vez, evitando duplicado
-    // - Si es multi todo riesgo: ya se agrego arriba, no repetir
-    // - Si hay plan A/A4: ya se agrego inline, no repetir
     if (!hayPlanSoloTarjeta && !hayMultiTodoRiesgoMismoCodigo) {
       msg += buildBloqueDA(comp, E, cobsDeComp, modoNorte, modoFedpat, esMoto);
     }
+
+    // Vigencia / periodicidad de facturación según la compañía
+    msg += `${E.fecha} *Vigencia ${BASE[comp].facturacion}*\n\n`;
+
+    if (hayMultiCompania) msg += '---\n\n';
   }
 
   // ── CIERRE ──
-  msg += `${E.fecha} *Vigencia anual*\n`;
   msg += `*¿Tenés alguna duda o consulta? ¡Quedo atento!* ${E.sonrisa}${E.ok}\n\n`;
   msg += `${E.maletin} *Christian Sanchez*\n`;
   msg += `_Tu Asesor de Seguros_`;
@@ -594,7 +570,6 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
 
   if (comp === 'norte') {
     if (esSoloTarjeta) {
-      // Plan A: según modo del selector
       if (modoNorte === 'contado') {
         return contado ? `${E.dinero} *Pago único: ${contado}*\n` : '';
       }
@@ -603,13 +578,11 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
     if (modoNorte === 'contado') {
       return contado ? `${E.dinero} *Pago único: ${contado}*\n` : '';
     }
-    // cuotas: solo precio mensual (DA va en bloque separado)
     return cuatri ? `${E.tarjeta} *Pago mensual: ${cuatri}*\n` : '';
   }
 
   if (comp === 'fedpat') {
     if (esSoloTarjeta) {
-      // Plan A4: según modo del selector
       if (modoFedpat === 'contado') {
         return contado ? `${E.dinero} *Pago único: ${contado}*\n` : '';
       }
@@ -618,7 +591,6 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
     if (modoFedpat === 'contado') {
       return contado ? `${E.dinero} *Pago único: ${contado}*\n` : '';
     }
-    // cuotas: solo precio mensual (DA va en bloque separado)
     return semest ? `${E.tarjeta} *Pago mensual: ${semest}*\n` : '';
   }
 
@@ -634,28 +606,49 @@ function buildPrecioLinea(cob, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
 }
 
 // ─────────────────────────────────────────────
+// HELPER — frase de precio fijo (reemplaza a "Vigencia anual")
+// Se muestra justo después del precio, solo cuando se cotiza en
+// cuotas (Norte = 4 cuotas fijas, FedPat = 6 cuotas fijas).
+// Sancor no aplica: factura mensual sin período de cuotas fijo.
+// ─────────────────────────────────────────────
+function buildFrasePrecioFijo(comp, E, modoNorte = 'cuotas', modoFedpat = 'cuotas') {
+  if (comp === 'norte' && modoNorte !== 'contado') {
+    return `${E.franq} *Un dato importante: el valor queda fijo durante los 4 meses, así que ya sabés cuánto vas a pagar mes a mes.*\n`;
+  }
+  if (comp === 'fedpat' && modoFedpat !== 'contado') {
+    return `${E.franq} *Un dato importante: el valor queda fijo durante los 6 meses, así que ya sabés cuánto vas a pagar mes a mes.*\n`;
+  }
+  return '';
+}
+
+// Agrega un salto de línea antes de la frase para separarla visualmente
+// del precio — solo si la frase existe (evita espacio de más en "contado").
+function aplicarEspaciadoFrase(frase) {
+  return frase ? '\n' + frase : '';
+}
+
+// ─────────────────────────────────────────────
 // HELPER — bloque débito automático
+// Orden: Mercado Pago primero (línea propia), luego
+// Tarjeta de Crédito / CBU débito automático juntos.
 // ─────────────────────────────────────────────
 function buildBloqueDA(comp, E, cobsDeComp, modoNorte, modoFedpat, esMoto = false) {
   if (comp === 'norte') {
     if (modoNorte === 'contado') return '';
-    // Plan A auto: solo tarjeta, sin bloque DA
     const soloTarjetaAutoNorte = (cobsDeComp || []).every(c => c.solo_tarjeta_credito === true) && !esMoto;
     if (soloTarjetaAutoNorte) return '';
-    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día y 5% adicional de descuento* / ${E.mp} *Mercado Pago*\n\n`;
+    return `${E.mp} *Mercado Pago*\n${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día y 5% adicional de descuento*\n\n`;
   }
   if (comp === 'fedpat') {
     if (modoFedpat === 'contado') return '';
-    // Plan A4 auto: solo tarjeta, sin bloque DA
     const soloTarjetaAutoFedpat = (cobsDeComp || []).every(c => c.solo_tarjeta_credito === true) && !esMoto;
     if (soloTarjetaAutoFedpat) return '';
-    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día* / ${E.mp} *Mercado Pago*\n\n`;
+    return `${E.mp} *Mercado Pago*\n${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día*\n\n`;
   }
   if (comp === 'sancor') {
-    // Si todos los planes de Sancor son Max 1, ya tienen DA inline — no generar bloque
     const soloMax1 = (cobsDeComp || []).every(c => c.codigo === 'Max 1');
     if (soloMax1) return '';
-    return `${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día* / ${E.mp} *Mercado Pago*\n\n`;
+    return `${E.mp} *Mercado Pago*\n${E.tarjeta} *Tarjeta de Crédito* / ${E.banco} *CBU — Débito automático: siempre al día*\n\n`;
   }
   return '';
 }
