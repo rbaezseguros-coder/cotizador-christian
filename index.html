@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotizador Pro — Christian Sanchez PAS</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1a1714">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -820,6 +822,18 @@ function nuevaCotizacion() {
   irPaso(1);
 }
 </script>
+  // ── Detectar cotización recibida por "Compartir" (Web Share Target) ──
+(function comprobarCompartido() {
+  try {
+    const pendiente = sessionStorage.getItem('cotizacion_pendiente');
+    if (pendiente) {
+      sessionStorage.removeItem('cotizacion_pendiente');
+      cotizacion = JSON.parse(pendiente);
+      mostrarCoberturas();
+      irPaso(2);
+    }
+  } catch (e) { console.error('Error cargando cotización compartida:', e); }
+})();
   </script>
 
 <footer style="text-align:center; margin:40px 0 10px; font-size:12px; color:#666;">
