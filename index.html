@@ -696,7 +696,7 @@ async function generarMensaje() {
   }
 }
 
-// ── PDF CON MARCA (header/footer Christian Sanchez + tapado de coberturas no elegidas) ──
+// ── PDF CON MARCA (header/footer Christian Sanchez) ──
 
 // Lee los items de texto de una página con pdf.js (posición y contenido real).
 async function leerItemsDeTexto(srcBytes, numeroPagina) {
@@ -714,64 +714,22 @@ async function leerItemsDeTexto(srcBytes, numeroPagina) {
 // Devuelve la posición Y de la línea de texto real más baja de la página,
 // ignorando marcas sueltas/ocultas que no son una línea de texto visible normal.
 function detectarFinDeContenido(items) {
-  const conteoPorY = new Map();
+  const caracteresPorY = new Map();
   items.forEach(item => {
     if (!item.str || !item.str.trim()) return;
     const y = Math.round(item.transform[5]);
-    conteoPorY.set(y, (conteoPorY.get(y) || 0) + 1);
+    const cantidad = item.str.trim().length;
+    caracteresPorY.set(y, (caracteresPorY.get(y) || 0) + cantidad);
   });
-  const ys = [...conteoPorY.keys()].sort((a, b) => a - b);
+  const ys = [...caracteresPorY.keys()].sort((a, b) => a - b);
   for (const y of ys) {
-    if (conteoPorY.get(y) >= 3) return y;
+    if (caracteresPorY.get(y) >= 6) return y;
   }
   return ys.length ? ys[0] : null;
 }
 
-function detectarCompaniaEnTexto(items) {
-  const texto = items.map(i => i.str).join(' ').toUpperCase();
-  if (texto.includes('FEDERACION PATRONAL') || texto.includes('FEDPAT')) return 'fedpat';
-  if (texto.includes('SANCOR')) return 'sancor';
-  if (texto.includes('EL NORTE') || texto.includes('ELNORTE')) return 'norte';
-  return null;
-}
-
-function buscarYdeTexto(items, textoBuscado) {
-  if (!textoBuscado) return null;
-  const encontrado = items.find(i => i.str && i.str.includes(textoBuscado));
-  return encontrado ? Math.round(encontrado.transform[5]) : null;
-}
-
-// Calcula los rectángulos (bandas horizontales) a tapar en blanco: una por cada
-// fila de cobertura que NO está seleccionada. Ubica cada fila buscando su precio
-// (tal cual lo extrajo la IA) en el texto real del PDF.
-function calcularFilasATapar(items, coberturasDeEstaCia) {
-  if (!coberturasDeEstaCia || coberturasDeEstaCia.length < 2) return [];
-
-  const ALTO_FILA_ESTIMADO = 46; // separación típica entre el inicio de una fila y la siguiente
-  const MARGEN = 14;
-
-  const filas = coberturasDeEstaCia.map(c => {
-    const precio = c.precio_contado || c.precio_cuatrimestral || c.precio_mensual || c.precio_semestral;
-    return { id: c.id, y: buscarYdeTexto(items, precio) };
-  }).filter(f => f.y !== null);
-
-  if (filas.length < 2) return [];
-
-  filas.sort((a, b) => b.y - a.y); // de arriba hacia abajo
-
-  const rectangulos = [];
-  filas.forEach((fila, i) => {
-    if (seleccionados.has(fila.id)) return; // no tapamos la fila elegida
-    const yTop = fila.y + MARGEN;
-    const ySiguiente = i + 1 < filas.length ? filas[i + 1].y : fila.y - ALTO_FILA_ESTIMADO;
-    const yBottom = ySiguiente + MARGEN;
-    rectangulos.push({ yTop, yBottom: Math.max(0, yBottom) });
-  });
-  return rectangulos;
-}
-
 async function generarPDFConMarca() {
-  const { PDFDocument, rgb } = PDFLib;
+  const { PDFDocument } = PDFLib;
   const outDoc = await PDFDocument.create();
 
   const [headerBytes, footerBytes] = await Promise.all([
@@ -804,18 +762,6 @@ async function generarPDFConMarca() {
 
       newPage.drawImage(headerImg, { x: 0, y: height, width, height: headerH });
       newPage.drawPage(embeddedPage, { x: 0, y: 0, width, height });
-
-      // Tapar en blanco las coberturas que no fueron seleccionadas
-      const cia = detectarCompaniaEnTexto(items);
-      const coberturasDeEstaCia = cotizacion.coberturas.filter(c => c.compania === cia);
-      const rectangulos = calcularFilasATapar(items, coberturasDeEstaCia);
-      rectangulos.forEach(r => {
-        newPage.drawRectangle({
-          x: 0, y: r.yBottom, width, height: r.yTop - r.yBottom,
-          color: rgb(1, 1, 1)
-        });
-      });
-
       newPage.drawImage(footerImg, { x: 0, y: footerY, width, height: footerH });
     }
   }
