@@ -323,10 +323,14 @@ input[type="file"] { display: none; }
     </div>
 
     <div class="result-box" id="resultBox" contenteditable="false"></div>
-    <label style="display:flex;align-items:center;gap:8px;margin:12px 0;font-size:13px;color:var(--ink-dim);cursor:pointer;user-select:none;">
-      <input type="checkbox" id="chkPdfMarca" style="width:16px;height:16px;cursor:pointer;">
-      📄 Adjuntar PDF con mi marca
+    <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:13px;color:var(--ink-dim);cursor:pointer;user-select:none;">
+      <input type="checkbox" id="chkPdfMarca" style="width:16px;height:16px;cursor:pointer;" onchange="document.getElementById('formatoAdjuntoWrap').style.display = this.checked ? 'flex' : 'none';">
+      📄 Adjuntar cotización con mi marca
     </label>
+    <div id="formatoAdjuntoWrap" style="display:none;gap:16px;margin:0 0 12px 26px;font-size:12px;color:var(--ink-dim);">
+      <label style="cursor:pointer;"><input type="radio" name="formatoAdjunto" value="pdf" checked> PDF</label>
+      <label style="cursor:pointer;"><input type="radio" name="formatoAdjunto" value="imagen"> Imagen</label>
+    </div>
     <button class="btn-whatsapp" id="btnWA" onclick="enviarAWhatsApp()">💬 Abrir en WhatsApp</button>
     <button class="btn-secondary" onclick="comparativaSeleccionados.clear();document.getElementById('compResultWrap').classList.remove('show');irPaso(2)">← Cambiar selección</button>
 
@@ -770,13 +774,30 @@ async function generarPDFConMarca() {
   return new Blob([outBytes], { type: 'application/pdf' });
 }
 
-function nombreArchivoCotizacion() {
+// Renderiza la primera página del PDF ya armado (con header/footer) como imagen PNG.
+// Nota: si la cotización ocupa más de una página, solo se convierte la primera.
+async function generarImagenConMarca() {
+  const pdfBlob = await generarPDFConMarca();
+  const pdfBytes = await pdfBlob.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.5 }); // buena resolución para verse nítido en WhatsApp
+
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+function nombreArchivoCotizacion(extension) {
   const numCot = cotizacion.coberturas?.[0]?.numero_cotizacion;
   if (numCot) {
     const limpio = String(numCot).replace(/[^0-9A-Za-z]/g, '');
-    return `Cotizacion-${limpio}.pdf`;
+    return `Cotizacion-${limpio}.${extension}`;
   }
-  return 'Cotizacion-Christian-Sanchez.pdf';
+  return `Cotizacion-Christian-Sanchez.${extension}`;
 }
 
 async function enviarAWhatsApp() {
@@ -784,17 +805,19 @@ async function enviarAWhatsApp() {
   if (!texto) return;
 
   const adjuntarPdf = document.getElementById('chkPdfMarca')?.checked;
+  const formato = document.querySelector('input[name="formatoAdjunto"]:checked')?.value || 'pdf';
 
   if (adjuntarPdf && archivos.length) {
     const btn = document.getElementById('btnWA');
     const original = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner"></div> Generando PDF...';
+    btn.innerHTML = `<div class="spinner"></div> Generando ${formato === 'imagen' ? 'imagen' : 'PDF'}...`;
 
     try {
-      const blob = await generarPDFConMarca();
-      const nombreArchivo = nombreArchivoCotizacion();
-      const file = new File([blob], nombreArchivo, { type: 'application/pdf' });
+      const esImagen = formato === 'imagen';
+      const blob = esImagen ? await generarImagenConMarca() : await generarPDFConMarca();
+      const nombreArchivo = nombreArchivoCotizacion(esImagen ? 'png' : 'pdf');
+      const file = new File([blob], nombreArchivo, { type: esImagen ? 'image/png' : 'application/pdf' });
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], text: texto });
@@ -802,7 +825,7 @@ async function enviarAWhatsApp() {
       }
 
       // Fallback (desktop / navegadores sin Web Share con archivos):
-      // se descarga el PDF y se abre WhatsApp con el texto para adjuntarlo a mano.
+      // se descarga el archivo y se abre WhatsApp con el texto para adjuntarlo a mano.
       const urlBlob = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = urlBlob;
@@ -810,11 +833,11 @@ async function enviarAWhatsApp() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      showStatus('status2', 'info', '📄 PDF descargado — adjuntalo en WhatsApp junto con el texto');
+      showStatus('status2', 'info', `📎 ${esImagen ? 'Imagen' : 'PDF'} descargado — adjuntalo en WhatsApp junto con el texto`);
     } catch (err) {
       if (err.name === 'AbortError') { btn.disabled = false; btn.innerHTML = original; return; }
       console.error(err);
-      showStatus('status2', 'error', '⚠️ No se pudo generar el PDF: ' + err.message);
+      showStatus('status2', 'error', '⚠️ No se pudo generar el archivo: ' + err.message);
     } finally {
       btn.disabled = false;
       btn.innerHTML = original;
